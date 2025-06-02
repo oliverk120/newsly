@@ -98,7 +98,20 @@ db.serialize(() => {
 
 // Endpoint to get all articles
 app.get('/articles', (req, res) => {
-  db.all('SELECT id, title, description, time, link FROM articles ORDER BY created_at DESC', [], (err, rows) => {
+  const query = `
+    SELECT
+      a.id,
+      a.title,
+      a.description,
+      a.time,
+      a.link,
+      EXISTS (
+        SELECT 1 FROM article_filter_matches m WHERE m.article_id = a.id
+      ) AS matched
+    FROM articles a
+    ORDER BY a.created_at DESC`;
+
+  db.all(query, [], (err, rows) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'Failed to retrieve articles' });
