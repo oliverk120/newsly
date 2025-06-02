@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>News Scraper</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background-color: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>News Scraper</h1>
+  <button id="scrapeBtn">Scrape Articles</button>
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Description</th>
+        <th>Time</th>
+        <th>Link</th>
+      </tr>
+    </thead>
+    <tbody id="articlesBody"></tbody>
+  </table>
+<script>
+async function loadArticles() {
+  const res = await fetch('/articles');
+  const articles = await res.json();
+  const tbody = document.getElementById('articlesBody');
+  tbody.innerHTML = '';
+  articles.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${a.title}</td><td>${a.description}</td><td>${a.time}</td>` +
+                   `<td><a href="${a.link}" target="_blank">Link</a></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('scrapeBtn').addEventListener('click', async () => {
+  await fetch('/scrape');
+  loadArticles();
+});
+
+loadArticles();
+</script>
+</body>
+</html>
