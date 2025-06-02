@@ -42,6 +42,31 @@
 
     <div id="stats" class="mb-2"></div>
 
+    <h2 class="text-xl font-semibold mb-2">Filters</h2>
+    <form id="addFilterForm" class="mb-4">
+      <input id="filter_name" class="border px-2 py-1 mr-2" placeholder="Name" />
+      <select id="filter_type" class="border px-2 py-1 mr-2">
+        <option value="keyword">Keyword</option>
+        <option value="embedding">Embedding</option>
+      </select>
+      <input id="filter_value" class="border px-2 py-1 mr-2" placeholder="Value" />
+      <label class="mr-2"><input type="checkbox" id="filter_active" checked /> Active</label>
+      <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
+    </form>
+
+    <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">Name</th>
+          <th class="border px-2 py-1">Type</th>
+          <th class="border px-2 py-1">Value</th>
+          <th class="border px-2 py-1">Active</th>
+          <th class="border px-2 py-1">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="filtersBody"></tbody>
+    </table>
+
     <h2 class="text-xl font-semibold mb-2">Articles</h2>
     <table class="table-auto w-full border-collapse">
       <thead>
@@ -177,9 +202,76 @@
         loadSources();
       });
 
+      async function loadFilters() {
+        const res = await fetch('/filters');
+        const filters = await res.json();
+        const tbody = document.getElementById('filtersBody');
+        tbody.innerHTML = '';
+        filters.forEach(f => {
+          const tr = document.createElement('tr');
+          tr.setAttribute('data-id', f.id);
+          tr.innerHTML =
+            `<td contenteditable="true" class="border px-2 py-1">${f.name || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.type}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.value || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.active}</td>` +
+            `<td class="border px-2 py-1">` +
+            `<button data-id="${f.id}" class="saveFilter bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
+            `<button data-id="${f.id}" class="deleteFilter bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
+            `</td>`;
+          tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.deleteFilter').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            await fetch(`/filters/${id}`, { method: 'DELETE' });
+            loadFilters();
+          });
+        });
+
+        document.querySelectorAll('.saveFilter').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const tr = e.target.closest('tr');
+            const id = tr.getAttribute('data-id');
+            const cells = tr.querySelectorAll('td');
+            const payload = {
+              name: cells[0].innerText.trim(),
+              type: cells[1].innerText.trim(),
+              value: cells[2].innerText.trim(),
+              active: cells[3].innerText.trim()
+            };
+            await fetch(`/filters/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            loadFilters();
+          });
+        });
+      }
+
+      document.getElementById('addFilterForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const payload = {
+          name: document.getElementById('filter_name').value,
+          type: document.getElementById('filter_type').value,
+          value: document.getElementById('filter_value').value,
+          active: document.getElementById('filter_active').checked ? 1 : 0
+        };
+        await fetch('/filters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        loadFilters();
+      });
+
       loadSources();
       loadArticles();
       loadStats();
+      loadFilters();
     </script>
   </body>
 </html>
