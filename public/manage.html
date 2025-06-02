@@ -1,0 +1,214 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Manage Sources & Filters</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-4">
+    <nav class="mb-4 space-x-4">
+      <a href="/" class="text-blue-600 underline">Home</a>
+      <a href="/manage.html" class="font-semibold">Manage Sources & Filters</a>
+    </nav>
+    <h1 class="text-2xl font-bold mb-4">Manage Sources & Filters</h1>
+
+    <h2 class="text-xl font-semibold mb-2">Sources</h2>
+    <form id="addSourceForm" class="mb-4">
+      <input id="base_url" class="border px-2 py-1 mr-2" placeholder="Base URL" required />
+      <input id="article_selector" class="border px-2 py-1 mr-2" placeholder="Article Selector" required />
+      <input id="title_selector" class="border px-2 py-1 mr-2" placeholder="Title Selector" required />
+      <input id="description_selector" class="border px-2 py-1 mr-2" placeholder="Description Selector" />
+      <input id="time_selector" class="border px-2 py-1 mr-2" placeholder="Time Selector" />
+      <input id="link_selector" class="border px-2 py-1 mr-2" placeholder="Link Selector" />
+      <input id="image_selector" class="border px-2 py-1 mr-2" placeholder="Image Selector" />
+      <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
+    </form>
+
+    <table class="table-auto w-full mb-6 border-collapse" id="sourcesTable">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">Base URL</th>
+          <th class="border px-2 py-1">Article Selector</th>
+          <th class="border px-2 py-1">Title Selector</th>
+          <th class="border px-2 py-1">Description Selector</th>
+          <th class="border px-2 py-1">Time Selector</th>
+          <th class="border px-2 py-1">Link Selector</th>
+          <th class="border px-2 py-1">Image Selector</th>
+          <th class="border px-2 py-1">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sourcesBody"></tbody>
+    </table>
+
+    <h2 class="text-xl font-semibold mb-2">Filters</h2>
+    <form id="addFilterForm" class="mb-4">
+      <input id="filter_name" class="border px-2 py-1 mr-2" placeholder="Name" />
+      <select id="filter_type" class="border px-2 py-1 mr-2">
+        <option value="keyword">Keyword</option>
+        <option value="embedding">Embedding</option>
+      </select>
+      <input id="filter_value" class="border px-2 py-1 mr-2" placeholder="Value" />
+      <label class="mr-2"><input type="checkbox" id="filter_active" checked /> Active</label>
+      <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
+    </form>
+
+    <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">Name</th>
+          <th class="border px-2 py-1">Type</th>
+          <th class="border px-2 py-1">Value</th>
+          <th class="border px-2 py-1">Active</th>
+          <th class="border px-2 py-1">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="filtersBody"></tbody>
+    </table>
+
+    <script>
+      async function loadSources() {
+        const res = await fetch('/sources');
+        const sources = await res.json();
+        const tbody = document.getElementById('sourcesBody');
+        tbody.innerHTML = '';
+        sources.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.setAttribute('data-id', s.id);
+          tr.innerHTML =
+            `<td contenteditable="true" class="border px-2 py-1">${s.base_url}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.article_selector}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.title_selector}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.description_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.time_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.link_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.image_selector || ''}</td>` +
+            `<td class="border px-2 py-1">` +
+            `<button data-id="${s.id}" class="saveSource bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
+            `<button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
+            `</td>`;
+          tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.deleteSource').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            await fetch(`/sources/${id}`, { method: 'DELETE' });
+            loadSources();
+          });
+        });
+
+        document.querySelectorAll('.saveSource').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const tr = e.target.closest('tr');
+            const id = tr.getAttribute('data-id');
+            const cells = tr.querySelectorAll('td');
+            const payload = {
+              base_url: cells[0].innerText.trim(),
+              article_selector: cells[1].innerText.trim(),
+              title_selector: cells[2].innerText.trim(),
+              description_selector: cells[3].innerText.trim(),
+              time_selector: cells[4].innerText.trim(),
+              link_selector: cells[5].innerText.trim(),
+              image_selector: cells[6].innerText.trim()
+            };
+            await fetch(`/sources/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            loadSources();
+          });
+        });
+      }
+
+      async function loadFilters() {
+        const res = await fetch('/filters');
+        const filters = await res.json();
+        const tbody = document.getElementById('filtersBody');
+        tbody.innerHTML = '';
+        filters.forEach(f => {
+          const tr = document.createElement('tr');
+          tr.setAttribute('data-id', f.id);
+          tr.innerHTML =
+            `<td contenteditable="true" class="border px-2 py-1">${f.name || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.type}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.value || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${f.active}</td>` +
+            `<td class="border px-2 py-1">` +
+            `<button data-id="${f.id}" class="saveFilter bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
+            `<button data-id="${f.id}" class="deleteFilter bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
+            `</td>`;
+          tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.deleteFilter').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            await fetch(`/filters/${id}`, { method: 'DELETE' });
+            loadFilters();
+          });
+        });
+
+        document.querySelectorAll('.saveFilter').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const tr = e.target.closest('tr');
+            const id = tr.getAttribute('data-id');
+            const cells = tr.querySelectorAll('td');
+            const payload = {
+              name: cells[0].innerText.trim(),
+              type: cells[1].innerText.trim(),
+              value: cells[2].innerText.trim(),
+              active: cells[3].innerText.trim()
+            };
+            await fetch(`/filters/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            loadFilters();
+          });
+        });
+      }
+
+      document.getElementById('addSourceForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const payload = {
+          base_url: document.getElementById('base_url').value,
+          article_selector: document.getElementById('article_selector').value,
+          title_selector: document.getElementById('title_selector').value,
+          description_selector: document.getElementById('description_selector').value,
+          time_selector: document.getElementById('time_selector').value,
+          link_selector: document.getElementById('link_selector').value,
+          image_selector: document.getElementById('image_selector').value
+        };
+        await fetch('/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        loadSources();
+      });
+
+      document.getElementById('addFilterForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const payload = {
+          name: document.getElementById('filter_name').value,
+          type: document.getElementById('filter_type').value,
+          value: document.getElementById('filter_value').value,
+          active: document.getElementById('filter_active').checked ? 1 : 0
+        };
+        await fetch('/filters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        loadFilters();
+      });
+
+      loadSources();
+      loadFilters();
+    </script>
+  </body>
+</html>
