@@ -9,6 +9,17 @@
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
 
     <h2 class="text-xl font-semibold mb-2">Sources</h2>
+    <form id="addSourceForm" class="mb-4">
+      <input id="base_url" class="border px-2 py-1 mr-2" placeholder="Base URL" required />
+      <input id="article_selector" class="border px-2 py-1 mr-2" placeholder="Article Selector" required />
+      <input id="title_selector" class="border px-2 py-1 mr-2" placeholder="Title Selector" required />
+      <input id="description_selector" class="border px-2 py-1 mr-2" placeholder="Description Selector" />
+      <input id="time_selector" class="border px-2 py-1 mr-2" placeholder="Time Selector" />
+      <input id="link_selector" class="border px-2 py-1 mr-2" placeholder="Link Selector" />
+      <input id="image_selector" class="border px-2 py-1 mr-2" placeholder="Image Selector" />
+      <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
+    </form>
+
     <table class="table-auto w-full mb-6 border-collapse" id="sourcesTable">
       <thead>
         <tr>
@@ -19,17 +30,22 @@
           <th class="border px-2 py-1">Time Selector</th>
           <th class="border px-2 py-1">Link Selector</th>
           <th class="border px-2 py-1">Image Selector</th>
+          <th class="border px-2 py-1">Actions</th>
         </tr>
       </thead>
       <tbody id="sourcesBody"></tbody>
     </table>
 
+    <div id="scrapeResults" class="mb-4 text-sm"></div>
     <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">Scrape Articles</button>
+
+    <div id="stats" class="mb-2"></div>
 
     <h2 class="text-xl font-semibold mb-2">Articles</h2>
     <table class="table-auto w-full border-collapse">
       <thead>
         <tr>
+          <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
           <th class="border px-2 py-1">Description</th>
           <th class="border px-2 py-1">Time</th>
@@ -53,8 +69,17 @@
             `<td class="border px-2 py-1">${s.description_selector || ''}</td>` +
             `<td class="border px-2 py-1">${s.time_selector || ''}</td>` +
             `<td class="border px-2 py-1">${s.link_selector || ''}</td>` +
-            `<td class="border px-2 py-1">${s.image_selector || ''}</td>`;
+            `<td class="border px-2 py-1">${s.image_selector || ''}</td>` +
+            `<td class="border px-2 py-1"><button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button></td>`;
           tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll('.deleteSource').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const id = e.target.getAttribute('data-id');
+            await fetch(`/sources/${id}`, { method: 'DELETE' });
+            loadSources();
+          });
         });
       }
 
@@ -63,9 +88,10 @@
         const articles = await res.json();
         const tbody = document.getElementById("articlesBody");
         tbody.innerHTML = "";
-        articles.forEach((a) => {
+        articles.forEach((a, idx) => {
           const tr = document.createElement("tr");
           tr.innerHTML =
+            `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1">${a.title}</td>` +
             `<td class="border px-2 py-1">${a.description}</td>` +
             `<td class="border px-2 py-1">${a.time}</td>` +
@@ -74,15 +100,53 @@
         });
       }
 
+      async function loadStats() {
+        const res = await fetch('/stats');
+        const data = await res.json();
+        const div = document.getElementById('stats');
+        let sourceParts = '';
+        for (const [src, count] of Object.entries(data.bySource)) {
+          sourceParts += `${src}: ${count} articles `;
+        }
+        div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | ${sourceParts}`;
+      }
+
       document
         .getElementById("scrapeBtn")
         .addEventListener("click", async () => {
-          await fetch("/scrape");
+          const res = await fetch("/scrape");
+          const data = await res.json();
+          const div = document.getElementById('scrapeResults');
+          div.innerHTML = data.details
+            .map(d => `${d.base_url}: scraped ${d.scraped}, added ${d.inserted}`)
+            .join('<br>');
           loadArticles();
+          loadStats();
         });
+
+      document.getElementById('addSourceForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+          base_url: document.getElementById('base_url').value,
+          article_selector: document.getElementById('article_selector').value,
+          title_selector: document.getElementById('title_selector').value,
+          description_selector: document.getElementById('description_selector').value,
+          time_selector: document.getElementById('time_selector').value,
+          link_selector: document.getElementById('link_selector').value,
+          image_selector: document.getElementById('image_selector').value
+        };
+        await fetch('/sources', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        e.target.reset();
+        loadSources();
+      });
 
       loadSources();
       loadArticles();
+      loadStats();
     </script>
   </body>
 </html>
