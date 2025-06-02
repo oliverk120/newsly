@@ -49,6 +49,7 @@
           <th class="border px-2 py-1">Description</th>
           <th class="border px-2 py-1">Time</th>
           <th class="border px-2 py-1">Link</th>
+          <th class="border px-2 py-1">Match</th>
         </tr>
       </thead>
       <tbody id="articlesBody"></tbody>
@@ -93,7 +94,8 @@
             `<td class="border px-2 py-1">${a.title}</td>` +
             `<td class="border px-2 py-1">${a.description}</td>` +
             `<td class="border px-2 py-1">${a.time}</td>` +
-            `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">Link</a></td>`;
+            `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">Link</a></td>` +
+            `<td class="border px-2 py-1 text-center">${a.matched ? '✅' : ''}</td>`;
           tbody.appendChild(tr);
         });
       }
