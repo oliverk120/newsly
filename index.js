@@ -77,6 +77,32 @@ app.get('/articles', (req, res) => {
   });
 });
 
+// Endpoint to get article statistics
+app.get('/stats', (req, res) => {
+  db.all('SELECT link FROM articles', [], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to retrieve stats' });
+    }
+
+    const bySource = {};
+    rows.forEach(r => {
+      try {
+        const origin = new URL(r.link).origin;
+        bySource[origin] = (bySource[origin] || 0) + 1;
+      } catch (e) {}
+    });
+
+    db.get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles', (err2, row) => {
+      if (err2) {
+        console.error(err2);
+        return res.status(500).json({ error: 'Failed to retrieve stats' });
+      }
+      res.json({ total: row.total, latest: row.latest, bySource });
+    });
+  });
+});
+
 // Endpoint to get all scraping sources
 app.get('/sources', (req, res) => {
   db.all('SELECT * FROM sources', [], (err, rows) => {
@@ -124,6 +150,18 @@ app.post('/sources', (req, res) => {
   );
 });
 
+// Endpoint to delete a scraping source
+app.delete('/sources/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM sources WHERE id = ?', [id], function (err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to delete source' });
+    }
+    res.json({ deleted: this.changes });
+  });
+});
+
 async function scrapeSource(source) {
   const response = await axios.get(source.base_url);
   const $ = cheerio.load(response.data);
@@ -169,6 +207,7 @@ app.get('/scrape', async (req, res) => {
     });
 
     let insertedTotal = 0;
+    const details = [];
 
     for (const source of sources) {
       const articles = await scrapeSource(source);
@@ -187,10 +226,17 @@ app.get('/scrape', async (req, res) => {
       });
 
       const results = await Promise.all(insertPromises);
-      insertedTotal += results.reduce((acc, cur) => acc + cur, 0);
+      const inserted = results.reduce((acc, cur) => acc + cur, 0);
+      insertedTotal += inserted;
+      details.push({
+        source_id: source.id,
+        base_url: source.base_url,
+        scraped: articles.length,
+        inserted
+      });
     }
 
-    res.json({ inserted: insertedTotal });
+    res.json({ inserted: insertedTotal, details });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Scraping failed' });
