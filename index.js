@@ -162,6 +162,43 @@ app.delete('/sources/:id', (req, res) => {
   });
 });
 
+// Endpoint to update a scraping source
+app.put('/sources/:id', (req, res) => {
+  const { id } = req.params;
+  const {
+    base_url,
+    article_selector,
+    title_selector,
+    description_selector,
+    time_selector,
+    link_selector,
+    image_selector,
+  } = req.body;
+
+  const params = [
+    base_url,
+    article_selector,
+    title_selector,
+    description_selector,
+    time_selector,
+    link_selector,
+    image_selector,
+    id,
+  ];
+
+  db.run(
+    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ? WHERE id = ?`,
+    params,
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed to update source' });
+      }
+      res.json({ updated: this.changes });
+    }
+  );
+});
+
 async function scrapeSource(source) {
   const response = await axios.get(source.base_url);
   const $ = cheerio.load(response.data);
