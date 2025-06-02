@@ -198,6 +198,7 @@ async function scrapeSource(source) {
 
 // Scrape endpoint
 app.get('/scrape', async (req, res) => {
+  const logs = [];
   try {
     const sources = await new Promise((resolve, reject) => {
       db.all('SELECT * FROM sources', [], (err, rows) => {
@@ -206,11 +207,21 @@ app.get('/scrape', async (req, res) => {
       });
     });
 
+    logs.push(`Found ${sources.length} sources`);
+
     let insertedTotal = 0;
     const details = [];
 
     for (const source of sources) {
-      const articles = await scrapeSource(source);
+      logs.push(`Fetching ${source.base_url}`);
+      let articles;
+      try {
+        articles = await scrapeSource(source);
+        logs.push(`Loaded ${articles.length} articles from ${source.base_url}`);
+      } catch (e) {
+        logs.push(`Failed to fetch ${source.base_url}: ${e.message}`);
+        continue;
+      }
 
       const insertPromises = articles.map(a => {
         return new Promise((resolve, reject) => {
@@ -228,6 +239,7 @@ app.get('/scrape', async (req, res) => {
       const results = await Promise.all(insertPromises);
       const inserted = results.reduce((acc, cur) => acc + cur, 0);
       insertedTotal += inserted;
+      logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
       details.push({
         source_id: source.id,
         base_url: source.base_url,
@@ -236,10 +248,12 @@ app.get('/scrape', async (req, res) => {
       });
     }
 
-    res.json({ inserted: insertedTotal, details });
+    logs.push(`Inserted total ${insertedTotal} new articles`);
+    res.json({ inserted: insertedTotal, details, logs });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Scraping failed' });
+    logs.push(`Error: ${err.message}`);
+    res.status(500).json({ error: 'Scraping failed', logs });
   }
 });
 
