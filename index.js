@@ -25,6 +25,36 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS filters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    type TEXT NOT NULL, -- 'keyword' or 'embedding'
+    value TEXT,
+    active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER,
+    filter_id INTEGER,
+    matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(article_id) REFERENCES articles(id),
+    FOREIGN KEY(filter_id) REFERENCES filters(id)
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
+    article_id INTEGER PRIMARY KEY,
+    embedding TEXT,
+    is_mna INTEGER,
+    acquiror TEXT,
+    target TEXT,
+    deal_value TEXT,
+    industry TEXT,
+    extra TEXT,
+    FOREIGN KEY(article_id) REFERENCES articles(id)
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     base_url TEXT,
@@ -199,6 +229,107 @@ app.put('/sources/:id', (req, res) => {
   );
 });
 
+// Get all filters
+app.get('/filters', (req, res) => {
+  db.all('SELECT * FROM filters', [], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to retrieve filters' });
+    }
+    res.json(rows);
+  });
+});
+
+// Add a filter
+app.post('/filters', (req, res) => {
+  const { name, type, value, active = 1 } = req.body;
+  db.run(
+    'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
+    [name, type, value, active],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed to add filter' });
+      }
+      res.json({ id: this.lastID });
+    }
+  );
+});
+
+// Update a filter
+app.put('/filters/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, type, value, active } = req.body;
+  db.run(
+    'UPDATE filters SET name = ?, type = ?, value = ?, active = ? WHERE id = ?',
+    [name, type, value, active, id],
+    function (err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'Failed to update filter' });
+      }
+      res.json({ updated: this.changes });
+    }
+  );
+});
+
+// Delete a filter
+app.delete('/filters/:id', (req, res) => {
+  const { id } = req.params;
+  db.run('DELETE FROM filters WHERE id = ?', [id], function (err) {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to delete filter' });
+    }
+    res.json({ deleted: this.changes });
+  });
+});
+
+async function runFilters(articleIds, logs) {
+  if (!articleIds.length) return;
+  const filters = await new Promise((resolve, reject) => {
+    db.all('SELECT * FROM filters WHERE active = 1', [], (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+
+  if (!filters.length) {
+    logs && logs.push('No active filters to run');
+    return;
+  }
+
+  for (const id of articleIds) {
+    const article = await new Promise((resolve, reject) => {
+      db.get('SELECT title, description FROM articles WHERE id = ?', [id], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    if (!article) continue;
+
+    for (const filter of filters) {
+      if (filter.type === 'keyword') {
+        const kw = (filter.value || '').toLowerCase();
+        const title = (article.title || '').toLowerCase();
+        const desc = (article.description || '').toLowerCase();
+        if (kw && (title.includes(kw) || desc.includes(kw))) {
+          await new Promise((resolve, reject) => {
+            db.run(
+              'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
+              [id, filter.id],
+              err => (err ? reject(err) : resolve())
+            );
+          });
+        }
+      } else if (filter.type === 'embedding') {
+        // TODO: implement semantic filtering using embeddings
+      }
+    }
+  }
+  logs && logs.push(`Ran ${filters.length} filters on ${articleIds.length} articles`);
+}
+
 async function scrapeSource(source) {
   const response = await axios.get(source.base_url);
   const $ = cheerio.load(response.data);
@@ -267,16 +398,20 @@ app.get('/scrape', async (req, res) => {
             [a.title, a.description, a.time, a.link, a.image],
             function (err) {
               if (err) return reject(err);
-              resolve(this.changes); // 1 if inserted, 0 if ignored
+              resolve({ changes: this.changes, id: this.lastID });
             }
           );
         });
       });
 
       const results = await Promise.all(insertPromises);
-      const inserted = results.reduce((acc, cur) => acc + cur, 0);
+      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
+      const insertedIds = results.filter(r => r.changes > 0).map(r => r.id);
       insertedTotal += inserted;
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
+      if (insertedIds.length) {
+        await runFilters(insertedIds, logs);
+      }
       details.push({
         source_id: source.id,
         base_url: source.base_url,
