@@ -36,7 +36,8 @@
       <tbody id="sourcesBody"></tbody>
     </table>
 
-    <div id="scrapeResults" class="mb-4 text-sm"></div>
+    <div id="scrapeResults" class="mb-2 text-sm"></div>
+    <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
     <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">Scrape Articles</button>
 
     <div id="stats" class="mb-2"></div>
@@ -120,6 +121,8 @@
           div.innerHTML = data.details
             .map(d => `${d.base_url}: scraped ${d.scraped}, added ${d.inserted}`)
             .join('<br>');
+          document.getElementById('scrapeLog').textContent =
+            (data.logs || []).join('\n');
           loadArticles();
           loadStats();
         });
