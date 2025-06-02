@@ -63,15 +63,19 @@
         tbody.innerHTML = '';
         sources.forEach((s) => {
           const tr = document.createElement('tr');
+          tr.setAttribute('data-id', s.id);
           tr.innerHTML =
-            `<td class="border px-2 py-1">${s.base_url}</td>` +
-            `<td class="border px-2 py-1">${s.article_selector}</td>` +
-            `<td class="border px-2 py-1">${s.title_selector}</td>` +
-            `<td class="border px-2 py-1">${s.description_selector || ''}</td>` +
-            `<td class="border px-2 py-1">${s.time_selector || ''}</td>` +
-            `<td class="border px-2 py-1">${s.link_selector || ''}</td>` +
-            `<td class="border px-2 py-1">${s.image_selector || ''}</td>` +
-            `<td class="border px-2 py-1"><button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button></td>`;
+            `<td contenteditable="true" class="border px-2 py-1">${s.base_url}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.article_selector}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.title_selector}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.description_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.time_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.link_selector || ''}</td>` +
+            `<td contenteditable="true" class="border px-2 py-1">${s.image_selector || ''}</td>` +
+            `<td class="border px-2 py-1">
+              <button data-id="${s.id}" class="saveSource bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>
+              <button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+            </td>`;
           tbody.appendChild(tr);
         });
 
@@ -79,6 +83,29 @@
           btn.addEventListener('click', async (e) => {
             const id = e.target.getAttribute('data-id');
             await fetch(`/sources/${id}`, { method: 'DELETE' });
+            loadSources();
+          });
+        });
+
+        document.querySelectorAll('.saveSource').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            const tr = e.target.closest('tr');
+            const id = tr.getAttribute('data-id');
+            const cells = tr.querySelectorAll('td');
+            const payload = {
+              base_url: cells[0].innerText.trim(),
+              article_selector: cells[1].innerText.trim(),
+              title_selector: cells[2].innerText.trim(),
+              description_selector: cells[3].innerText.trim(),
+              time_selector: cells[4].innerText.trim(),
+              link_selector: cells[5].innerText.trim(),
+              image_selector: cells[6].innerText.trim()
+            };
+            await fetch(`/sources/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
             loadSources();
           });
         });
@@ -115,14 +142,17 @@
       document
         .getElementById("scrapeBtn")
         .addEventListener("click", async () => {
+          const log = document.getElementById('scrapeLog');
+          const div = document.getElementById('scrapeResults');
+          log.textContent = '';
+          div.textContent = '';
+
           const res = await fetch("/scrape");
           const data = await res.json();
-          const div = document.getElementById('scrapeResults');
           div.innerHTML = data.details
             .map(d => `${d.base_url}: scraped ${d.scraped}, added ${d.inserted}`)
             .join('<br>');
-          document.getElementById('scrapeLog').textContent =
-            (data.logs || []).join('\n');
+          log.textContent = (data.logs || []).join('\n');
           loadArticles();
           loadStats();
         });
