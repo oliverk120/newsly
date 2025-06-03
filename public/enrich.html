@@ -22,6 +22,8 @@
           <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
           <th class="border px-2 py-1">Enrichments</th>
+          <th class="border px-2 py-1">Acquiror</th>
+          <th class="border px-2 py-1">Target</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
       </thead>
@@ -88,6 +90,38 @@
             log.textContent = JSON.stringify(data, null, 2);
           });
         });
+
+        document.querySelectorAll('.extractBtn').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            const log = document.getElementById('actionLog');
+            const results = document.getElementById('actionResults');
+            log.textContent = '';
+            results.textContent = '';
+            console.log('Extracting parties', id);
+
+            let data;
+            try {
+              const resp = await fetch(`/articles/${id}/extract-parties`, { method: 'POST' });
+              data = await resp.json();
+            } catch (err) {
+              console.error('Extract request failed', err);
+              results.textContent = 'Request failed';
+              return;
+            }
+
+            console.log('Extract response', data);
+            if (data.acquiror !== undefined && data.target !== undefined) {
+              const row = e.target.closest('tr');
+              row.querySelector('.acquiror-cell').textContent = data.acquiror;
+              row.querySelector('.target-cell').textContent = data.target;
+              results.textContent = `Extracted parties for article ${id}`;
+            } else if (data.error) {
+              results.textContent = `Error: ${data.error}`;
+            }
+            log.textContent = JSON.stringify(data, null, 2);
+          });
+        });
       }
 
       async function loadArticles() {
@@ -113,11 +147,13 @@
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
             `<td class="border px-2 py-1 space-x-1">` +
               `<button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button>` +
-              `<button disabled class="${disabledCls} px-2 py-1 rounded">Extract Parties</button>` +
+              `<button data-id="${a.id}" class="extractBtn bg-purple-500 text-white px-2 py-1 rounded">Extract Parties</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Deal Value</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Target Info</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Acquirer Info</button>` +
             `</td>` +
+            `<td class="border px-2 py-1 acquiror-cell">${a.acquiror || ''}</td>` +
+            `<td class="border px-2 py-1 target-cell">${a.target || ''}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
         });
