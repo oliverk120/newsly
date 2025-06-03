@@ -82,6 +82,16 @@
         });
       }
 
+      const colorClasses = [
+        'bg-red-200 text-red-800',
+        'bg-green-200 text-green-800',
+        'bg-blue-200 text-blue-800',
+        'bg-yellow-200 text-yellow-800',
+        'bg-purple-200 text-purple-800',
+        'bg-pink-200 text-pink-800',
+        'bg-orange-200 text-orange-800'
+      ];
+
       async function loadArticles() {
         const res = await fetch('/articles');
         const articles = await res.json();
@@ -89,13 +99,17 @@
         tbody.innerHTML = '';
         articles.forEach((a, idx) => {
           const tr = document.createElement('tr');
+          const pills = (a.filter_names || []).map((name, i) => {
+            const cls = colorClasses[a.filter_ids[i] % colorClasses.length];
+            return `<span class="px-2 py-1 mr-1 rounded text-xs ${cls}">${name}</span>`;
+          }).join('');
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1">${a.title}</td>` +
             `<td class="border px-2 py-1">${a.description}</td>` +
             `<td class="border px-2 py-1">${a.time}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">Link</a></td>` +
-            `<td class="border px-2 py-1 text-center">${a.matched ? '✅' : ''}</td>`;
+            `<td class="border px-2 py-1 text-center">${pills}</td>`;
           tbody.appendChild(tr);
         });
       }
