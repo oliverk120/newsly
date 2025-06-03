@@ -4,7 +4,7 @@ const cheerio = require('cheerio');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { OpenAI } = require('openai');
-const { parseOpenAIResponse } = require('./lib/extractParties');
+const { parseOpenAIResponse, getFirstSentence } = require('./lib/extractParties');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -623,20 +623,22 @@ app.post('/articles/:id/extract-parties', async (req, res) => {
   const { id } = req.params;
   try {
     const row = await new Promise((resolve, reject) => {
-      db.get('SELECT body FROM article_enrichments WHERE article_id = ?', [id], (err, r) => {
-        if (err) return reject(err);
-        resolve(r);
-      });
+      db.get(
+        `SELECT a.title, e.body FROM articles a JOIN article_enrichments e ON a.id = e.article_id WHERE a.id = ?`,
+        [id],
+        (err, r) => {
+          if (err) return reject(err);
+          resolve(r);
+        }
+      );
     });
     if (!row || !row.body) {
       return res.status(404).json({ error: 'Article text not found' });
     }
 
-    const firstSentence = row.body
-      .split(/\.(\s|$)/)[0]
-      .replace(/\s+/g, ' ')
-      .trim();
-    const prompt = `Extract the acquiror and target from this sentence. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Sentence: "${firstSentence}"`;
+    const firstSentence = getFirstSentence(row.body);
+    const titleAndSentence = `${row.title || ''} ${firstSentence}`.trim();
+    const prompt = `Extract the acquiror and target from this text. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Text: "${titleAndSentence}"`;
 
     console.log('First sentence:', firstSentence);
     console.log('Prompt:', prompt);
