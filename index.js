@@ -3,6 +3,9 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { OpenAI } = require('openai');
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -509,7 +512,8 @@ app.get('/run-filters', async (req, res) => {
 // Get today's articles that matched the M&A filter
 app.get('/articles/mna-today', (req, res) => {
   const query = `
-    SELECT a.id, a.title, a.description, a.time, a.link, ae.body
+    SELECT a.id, a.title, a.description, a.time, a.link,
+           ae.body, ae.acquiror, ae.target
     FROM articles a
     JOIN article_filter_matches m ON a.id = m.article_id
     JOIN filters f ON f.id = m.filter_id
@@ -610,6 +614,56 @@ app.post('/articles/:id/enrich', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to enrich article' });
+  }
+});
+
+// Extract acquiror and target using GPT-3.5 from the first sentence
+app.post('/articles/:id/extract-parties', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const row = await new Promise((resolve, reject) => {
+      db.get('SELECT body FROM article_enrichments WHERE article_id = ?', [id], (err, r) => {
+        if (err) return reject(err);
+        resolve(r);
+      });
+    });
+    if (!row || !row.body) {
+      return res.status(404).json({ error: 'Article text not found' });
+    }
+
+    const firstSentence = row.body.split(/\.(\s|$)/)[0].replace(/\s+/g, ' ').trim();
+    const prompt = `Extract the acquiror and target from this sentence. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Sentence: "${firstSentence}"`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0
+    });
+
+    let acquiror = 'N/A';
+    let target = 'N/A';
+    try {
+      const parsed = JSON.parse(resp.choices[0].message.content.trim());
+      if (parsed.acquiror) acquiror = parsed.acquiror;
+      if (parsed.target) target = parsed.target;
+    } catch (e) {
+      console.error('Failed parsing OpenAI response', e);
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO article_enrichments (article_id, acquiror, target)
+         VALUES (?, ?, ?)
+         ON CONFLICT(article_id) DO UPDATE SET acquiror = excluded.acquiror, target = excluded.target`,
+        [id, acquiror, target],
+        err => (err ? reject(err) : resolve())
+      );
+    });
+
+    res.json({ success: true, acquiror, target });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to extract parties' });
   }
 });
 
