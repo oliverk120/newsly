@@ -14,9 +14,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Initialize SQLite database
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS articles (
+async function initDb() {
+  await db.run(`CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     description TEXT,
@@ -26,7 +25,7 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS filters (
+  await db.run(`CREATE TABLE IF NOT EXISTS filters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     type TEXT NOT NULL, -- 'keyword' or 'embedding'
@@ -35,7 +34,7 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
+  await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id INTEGER,
     filter_id INTEGER,
@@ -44,7 +43,7 @@ db.serialize(() => {
     FOREIGN KEY(filter_id) REFERENCES filters(id)
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
+  await db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
     article_id INTEGER PRIMARY KEY,
     embedding TEXT,
     is_mna INTEGER,
@@ -57,16 +56,13 @@ db.serialize(() => {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
-  db.all('PRAGMA table_info(article_enrichments)', (err, rows) => {
-    if (!err) {
-      const hasBody = rows.some(r => r.name === 'body');
-      if (!hasBody) {
-        db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
-      }
-    }
-  });
+  const aeInfo = await db.all('PRAGMA table_info(article_enrichments)');
+  const hasBody = aeInfo.some(r => r.name === 'body');
+  if (!hasBody) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
+  }
 
-  db.run(`CREATE TABLE IF NOT EXISTS sources (
+  await db.run(`CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     base_url TEXT,
     article_selector TEXT,
@@ -78,45 +74,32 @@ db.serialize(() => {
     body_selector TEXT
   )`);
 
-  db.all('PRAGMA table_info(sources)', (err, rows) => {
-    if (!err) {
-      const hasBody = rows.some(r => r.name === 'body_selector');
-      if (!hasBody) {
-        db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
-      }
-    }
-  });
+  const srcInfo = await db.all('PRAGMA table_info(sources)');
+  const hasBodySel = srcInfo.some(r => r.name === 'body_selector');
+  if (!hasBodySel) {
+    await db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
+  }
 
-  db.get('SELECT COUNT(*) as count FROM sources', (err, row) => {
-    if (err) {
-      return console.error('Failed to check sources table', err);
-    }
-    if (row.count === 0) {
-      const insert = `INSERT INTO sources
+  const row = await db.get('SELECT COUNT(*) as count FROM sources');
+  if (row.count === 0) {
+    const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
          time_selector, link_selector, image_selector, body_selector)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-      db.run(
-        insert,
-        [
-          'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
-          'div.col-sm-12.card',
-          'h3',
-          'p',
-          'h3 small',
-          'a.newsreleaseconsolidatelink',
-          null,
-          '#release-body'
-        ],
-        err2 => {
-          if (err2) {
-            console.error('Failed to insert default source', err2);
-          }
-        }
-      );
-    }
-  });
-});
+    await db.run(insert, [
+      'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
+      'div.col-sm-12.card',
+      'h3',
+      'p',
+      'h3 small',
+      'a.newsreleaseconsolidatelink',
+      null,
+      '#release-body'
+    ]);
+  }
+}
+
+initDb().catch(err => console.error('Failed to init db', err));
 app.use('/articles', require('./routes/articles'));
 app.use('/sources', require('./routes/sources'));
 app.use('/filters', require('./routes/filters'));
@@ -124,13 +107,9 @@ app.use('/filters', require('./routes/filters'));
 
 
 // Endpoint to get article statistics
-app.get('/stats', (req, res) => {
-  db.all('SELECT link FROM articles', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve stats' });
-    }
-
+app.get('/stats', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT link FROM articles');
     const bySource = {};
     rows.forEach(r => {
       try {
@@ -139,14 +118,12 @@ app.get('/stats', (req, res) => {
       } catch (e) {}
     });
 
-    db.get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles', (err2, row) => {
-      if (err2) {
-        console.error(err2);
-        return res.status(500).json({ error: 'Failed to retrieve stats' });
-      }
-      res.json({ total: row.total, latest: row.latest, bySource });
-    });
-  });
+    const row = await db.get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles');
+    res.json({ total: row.total, latest: row.latest, bySource });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve stats' });
+  }
 });
 
 
@@ -155,12 +132,7 @@ app.get('/stats', (req, res) => {
 app.get('/scrape', async (req, res) => {
   const logs = [];
   try {
-    const sources = await new Promise((resolve, reject) => {
-      db.all('SELECT * FROM sources', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      });
-    });
+    const sources = await db.all('SELECT * FROM sources');
 
     logs.push(`Found ${sources.length} sources`);
 
@@ -178,18 +150,12 @@ app.get('/scrape', async (req, res) => {
         continue;
       }
 
-      const insertPromises = articles.map(a => {
-        return new Promise((resolve, reject) => {
-          db.run(
-            'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
-            [a.title, a.description, a.time, a.link, a.image],
-            function (err) {
-              if (err) return reject(err);
-              resolve({ changes: this.changes, id: this.lastID });
-            }
-          );
-        });
-      });
+      const insertPromises = articles.map(a =>
+        db.run(
+          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
+          [a.title, a.description, a.time, a.link, a.image]
+        )
+      );
 
       const results = await Promise.all(insertPromises);
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
@@ -222,18 +188,10 @@ app.get('/scrape', async (req, res) => {
 app.get('/run-filters', async (req, res) => {
   const logs = [];
   try {
-    const ids = await new Promise((resolve, reject) => {
-      db.all('SELECT id FROM articles', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows.map(r => r.id));
-      });
-    });
+    const rows = await db.all('SELECT id FROM articles');
+    const ids = rows.map(r => r.id);
 
-    await new Promise((resolve, reject) => {
-      db.run('DELETE FROM article_filter_matches', err =>
-        err ? reject(err) : resolve()
-      );
-    });
+    await db.run('DELETE FROM article_filter_matches');
     logs.push('Cleared previous filter matches');
 
     await runFilters(db, ids, logs);
