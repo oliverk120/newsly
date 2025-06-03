@@ -21,7 +21,7 @@
         <tr>
           <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
-          <th class="border px-2 py-1">Actions</th>
+          <th class="border px-2 py-1">Enrichments</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
       </thead>
@@ -107,10 +107,17 @@
           const btnLabel = a.body ? 'Refresh Text' : 'Get Article Text';
           const bodyHtml = a.body ? formatBody(a.body) : '';
           const hiddenClass = a.body ? '' : 'hidden';
+          const disabledCls = 'bg-gray-300 text-gray-600 cursor-not-allowed';
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
-            `<td class="border px-2 py-1"><button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button></td>` +
+            `<td class="border px-2 py-1 space-x-1">` +
+              `<button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button>` +
+              `<button disabled class="${disabledCls} px-2 py-1 rounded">Extract Parties</button>` +
+              `<button disabled class="${disabledCls} px-2 py-1 rounded">Deal Value</button>` +
+              `<button disabled class="${disabledCls} px-2 py-1 rounded">Target Info</button>` +
+              `<button disabled class="${disabledCls} px-2 py-1 rounded">Acquirer Info</button>` +
+            `</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
         });
