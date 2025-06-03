@@ -12,8 +12,10 @@
       <a href="/enrich.html" class="font-semibold">Today's M&A</a>
     </nav>
     <h1 class="text-2xl font-bold mb-4">Today's M&A Articles</h1>
-    <div id="actionResults" class="mb-2 text-sm"></div>
-    <pre id="actionLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
+
+    <div id="actionResults" class="mb-2 text-sm" style="min-height:1.25rem;"></div>
+    <pre id="actionLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap" style="max-height:200px;overflow:auto;"></pre>
+
     <table class="table-auto w-full border-collapse">
       <thead>
         <tr>
@@ -61,8 +63,17 @@
             log.textContent = '';
             results.textContent = '';
             console.log('Enriching article', id);
-            const resp = await fetch(`/articles/${id}/enrich`, { method: 'POST' });
-            const data = await resp.json();
+
+            let data;
+            try {
+              const resp = await fetch(`/articles/${id}/enrich`, { method: 'POST' });
+              data = await resp.json();
+            } catch (err) {
+              console.error('Enrich request failed', err);
+              results.textContent = 'Request failed';
+              return;
+            }
+
             console.log('Enrich response', data);
             if (data.body) {
               const wrapper = e.target.closest('tr').querySelector('.article-body');
@@ -80,8 +91,15 @@
       }
 
       async function loadArticles() {
-        const res = await fetch('/articles/mna-today');
-        const articles = await res.json();
+        let articles = [];
+        try {
+          const res = await fetch('/articles/mna-today');
+          articles = await res.json();
+        } catch (err) {
+          console.error('Failed loading articles', err);
+          document.getElementById('actionResults').textContent = 'Failed loading articles';
+          return;
+        }
         const tbody = document.getElementById('articlesBody');
         tbody.innerHTML = '';
         articles.forEach((a, idx) => {
