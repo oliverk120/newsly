@@ -73,8 +73,18 @@ db.serialize(() => {
     description_selector TEXT,
     time_selector TEXT,
     link_selector TEXT,
-    image_selector TEXT
+    image_selector TEXT,
+    body_selector TEXT
   )`);
+
+  db.all('PRAGMA table_info(sources)', (err, rows) => {
+    if (!err) {
+      const hasBody = rows.some(r => r.name === 'body_selector');
+      if (!hasBody) {
+        db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
+      }
+    }
+  });
 
   db.get('SELECT COUNT(*) as count FROM sources', (err, row) => {
     if (err) {
@@ -83,8 +93,8 @@ db.serialize(() => {
     if (row.count === 0) {
       const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
-         time_selector, link_selector, image_selector)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`;
+         time_selector, link_selector, image_selector, body_selector)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
       db.run(
         insert,
         [
@@ -95,6 +105,7 @@ db.serialize(() => {
           'h3 small',
           'a.newsreleaseconsolidatelink',
           null,
+          '#release-body'
         ],
         err2 => {
           if (err2) {
@@ -185,7 +196,8 @@ app.post('/sources', (req, res) => {
     description_selector,
     time_selector,
     link_selector,
-    image_selector
+    image_selector,
+    body_selector
   } = req.body;
 
   const params = [
@@ -195,12 +207,13 @@ app.post('/sources', (req, res) => {
     description_selector,
     time_selector,
     link_selector,
-    image_selector
+    image_selector,
+    body_selector
   ];
 
   db.run(
-    `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     params,
     function (err) {
       if (err) {
@@ -235,6 +248,7 @@ app.put('/sources/:id', (req, res) => {
     time_selector,
     link_selector,
     image_selector,
+    body_selector,
   } = req.body;
 
   const params = [
@@ -245,11 +259,12 @@ app.put('/sources/:id', (req, res) => {
     time_selector,
     link_selector,
     image_selector,
+    body_selector,
     id,
   ];
 
   db.run(
-    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ? WHERE id = ?`,
+    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
     params,
     function (err) {
       if (err) {
@@ -523,10 +538,30 @@ app.post('/articles/:id/enrich', async (req, res) => {
     });
     if (!article) return res.status(404).json({ error: 'Article not found' });
 
+    const sources = await new Promise((resolve, reject) => {
+      db.all('SELECT * FROM sources', [], (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows);
+      });
+    });
+
+    let bodySelector = null;
+    try {
+      const articleHost = new URL(article.link).hostname;
+      const src = sources.find(s => {
+        try {
+          return new URL(s.base_url).hostname === articleHost;
+        } catch (e) {
+          return false;
+        }
+      });
+      if (src) bodySelector = src.body_selector || null;
+    } catch (e) {}
+
     const response = await axios.get(article.link);
     const $ = cheerio.load(response.data);
 
-    const selectors = [
+    const fallbackSelectors = [
       '#bw-release-story',
       '.bw-release-story',
       '#release-body',
@@ -536,14 +571,19 @@ app.post('/articles/:id/enrich', async (req, res) => {
     ];
 
     let container = null;
-    for (const sel of selectors) {
-      const c = $(sel);
-      if (c.length) {
-        container = c;
-        break;
+    if (bodySelector) {
+      container = $(bodySelector);
+    }
+    if (!container || !container.length) {
+      for (const sel of fallbackSelectors) {
+        const c = $(sel);
+        if (c.length) {
+          container = c;
+          break;
+        }
       }
     }
-    if (!container) {
+    if (!container || !container.length) {
       container = $('body');
     }
 

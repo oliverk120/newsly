@@ -22,6 +22,7 @@
       <input id="time_selector" class="border px-2 py-1 mr-2" placeholder="Time Selector" />
       <input id="link_selector" class="border px-2 py-1 mr-2" placeholder="Link Selector" />
       <input id="image_selector" class="border px-2 py-1 mr-2" placeholder="Image Selector" />
+      <input id="body_selector" class="border px-2 py-1 mr-2" placeholder="Body Selector" />
       <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
     </form>
 
@@ -35,6 +36,7 @@
           <th class="border px-2 py-1">Time Selector</th>
           <th class="border px-2 py-1">Link Selector</th>
           <th class="border px-2 py-1">Image Selector</th>
+          <th class="border px-2 py-1">Body Selector</th>
           <th class="border px-2 py-1">Actions</th>
         </tr>
       </thead>
@@ -81,9 +83,10 @@
             `<td contenteditable="true" class="border px-2 py-1">${s.title_selector}</td>` +
             `<td contenteditable="true" class="border px-2 py-1">${s.description_selector || ''}</td>` +
             `<td contenteditable="true" class="border px-2 py-1">${s.time_selector || ''}</td>` +
-            `<td contenteditable="true" class="border px-2 py-1">${s.link_selector || ''}</td>` +
-            `<td contenteditable="true" class="border px-2 py-1">${s.image_selector || ''}</td>` +
-            `<td class="border px-2 py-1">` +
+           `<td contenteditable="true" class="border px-2 py-1">${s.link_selector || ''}</td>` +
+           `<td contenteditable="true" class="border px-2 py-1">${s.image_selector || ''}</td>` +
+           `<td contenteditable="true" class="border px-2 py-1">${s.body_selector || ''}</td>` +
+           `<td class="border px-2 py-1">` +
             `<button data-id="${s.id}" class="saveSource bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
             `<button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
             `</td>`;
@@ -110,7 +113,8 @@
               description_selector: cells[3].innerText.trim(),
               time_selector: cells[4].innerText.trim(),
               link_selector: cells[5].innerText.trim(),
-              image_selector: cells[6].innerText.trim()
+              image_selector: cells[6].innerText.trim(),
+              body_selector: cells[7].innerText.trim()
             };
             await fetch(`/sources/${id}`, {
               method: 'PUT',
@@ -180,7 +184,8 @@
           description_selector: document.getElementById('description_selector').value,
           time_selector: document.getElementById('time_selector').value,
           link_selector: document.getElementById('link_selector').value,
-          image_selector: document.getElementById('image_selector').value
+          image_selector: document.getElementById('image_selector').value,
+          body_selector: document.getElementById('body_selector').value
         };
         await fetch('/sources', {
           method: 'POST',
