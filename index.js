@@ -4,7 +4,9 @@ const cheerio = require('cheerio');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { OpenAI } = require('openai');
-const { parseOpenAIResponse, getFirstSentence } = require('./lib/extractParties');
+const createProcessArticle = require('./lib/enrichment/pipeline');
+const fetchBody = require('./lib/enrichment/fetchBody');
+const extractParties = require('./lib/enrichment/extractParties');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -17,6 +19,7 @@ app.use(express.json());
 
 // Initialize SQLite database
 const db = new sqlite3.Database(path.join(__dirname, 'raw_articles.db'));
+const processArticle = createProcessArticle(db, openai);
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS articles (
@@ -465,6 +468,13 @@ app.get('/scrape', async (req, res) => {
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
         await runFilters(insertedIds, logs);
+        for (const id of insertedIds) {
+          try {
+            await processArticle(id);
+          } catch (e) {
+            logs.push(`Enrichment failed for ${id}: ${e.message}`);
+          }
+        }
       }
       details.push({
         source_id: source.id,
@@ -535,82 +545,7 @@ app.get('/articles/mna-today', (req, res) => {
 app.post('/articles/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const article = await new Promise((resolve, reject) => {
-      db.get('SELECT link FROM articles WHERE id = ?', [id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
-    if (!article) return res.status(404).json({ error: 'Article not found' });
-
-    const sources = await new Promise((resolve, reject) => {
-      db.all('SELECT * FROM sources', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      });
-    });
-
-    let bodySelector = null;
-    try {
-      const articleHost = new URL(article.link).hostname;
-      const src = sources.find(s => {
-        try {
-          return new URL(s.base_url).hostname === articleHost;
-        } catch (e) {
-          return false;
-        }
-      });
-      if (src) bodySelector = src.body_selector || null;
-    } catch (e) {}
-
-    const response = await axios.get(article.link);
-    const $ = cheerio.load(response.data);
-
-    const fallbackSelectors = [
-      '#bw-release-story',
-      '.bw-release-story',
-      '#release-body',
-      '[itemprop="articleBody"]',
-      '.article-content',
-      'article'
-    ];
-
-    let container = null;
-    if (bodySelector) {
-      container = $(bodySelector);
-    }
-    if (!container || !container.length) {
-      for (const sel of fallbackSelectors) {
-        const c = $(sel);
-        if (c.length) {
-          container = c;
-          break;
-        }
-      }
-    }
-    if (!container || !container.length) {
-      container = $('body');
-    }
-
-    let text = container
-      .find('p, li')
-      .map((i, el) => $(el).text().trim())
-      .get()
-      .join('\n');
-    if (!text) {
-      text = container.text().trim();
-    }
-
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO article_enrichments (article_id, body)
-         VALUES (?, ?)
-         ON CONFLICT(article_id) DO UPDATE SET body = excluded.body`,
-        [id, text],
-        err => (err ? reject(err) : resolve())
-      );
-    });
-
+    const text = await fetchBody(db, id);
     res.json({ success: true, body: text });
   } catch (err) {
     console.error(err);
@@ -622,49 +557,7 @@ app.post('/articles/:id/enrich', async (req, res) => {
 app.post('/articles/:id/extract-parties', async (req, res) => {
   const { id } = req.params;
   try {
-    const row = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT a.title, e.body FROM articles a JOIN article_enrichments e ON a.id = e.article_id WHERE a.id = ?`,
-        [id],
-        (err, r) => {
-          if (err) return reject(err);
-          resolve(r);
-        }
-      );
-    });
-    if (!row || !row.body) {
-      return res.status(404).json({ error: 'Article text not found' });
-    }
-
-    const firstSentence = getFirstSentence(row.body);
-    const titleAndSentence = `${row.title || ''} ${firstSentence}`.trim();
-    const prompt = `Extract the acquiror and target from this text. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Text: "${titleAndSentence}"`;
-
-    console.log('First sentence:', firstSentence);
-    console.log('Prompt:', prompt);
-
-    const resp = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0
-    });
-
-    const output = resp.choices[0].message.content.trim();
-    console.log('OpenAI output:', output);
-
-    const { acquiror, target } = parseOpenAIResponse(output);
-    console.log('Conclusion:', { acquiror, target });
-
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO article_enrichments (article_id, acquiror, target)
-         VALUES (?, ?, ?)
-         ON CONFLICT(article_id) DO UPDATE SET acquiror = excluded.acquiror, target = excluded.target`,
-        [id, acquiror, target],
-        err => (err ? reject(err) : resolve())
-      );
-    });
-
+    const { firstSentence, prompt, output, acquiror, target } = await extractParties(db, openai, id);
     res.json({ success: true, firstSentence, prompt, output, acquiror, target });
   } catch (err) {
     console.error(err);
