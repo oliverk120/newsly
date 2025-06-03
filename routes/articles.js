@@ -8,7 +8,7 @@ const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Get all articles
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const query = `
     SELECT
       a.id,
@@ -24,11 +24,8 @@ router.get('/', (req, res) => {
     GROUP BY a.id
     ORDER BY a.created_at DESC`;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
+  try {
+    const rows = await db.all(query);
     rows.forEach(r => {
       r.filter_ids = r.filter_ids
         ? r.filter_ids.split(',').map(id => parseInt(id, 10))
@@ -37,11 +34,14 @@ router.get('/', (req, res) => {
       r.matched = r.filter_ids.length > 0;
     });
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve articles' });
+  }
 });
 
 // Get today's articles that matched the M&A filter
-router.get('/mna-today', (req, res) => {
+router.get('/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.target
@@ -52,13 +52,13 @@ router.get('/mna-today', (req, res) => {
     WHERE date(a.created_at) = date('now') AND f.name = 'M&A'
     ORDER BY a.created_at DESC`;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
+  try {
+    const rows = await db.all(query);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve articles' });
+  }
 });
 
 // Enrich an article by scraping its body text

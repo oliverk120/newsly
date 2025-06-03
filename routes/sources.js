@@ -4,18 +4,18 @@ const db = require('../db');
 const router = express.Router();
 
 // Get all scraping sources
-router.get('/', (req, res) => {
-  db.all('SELECT * FROM sources', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve sources' });
-    }
+router.get('/', async (req, res) => {
+  try {
+    const rows = await db.all('SELECT * FROM sources');
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve sources' });
+  }
 });
 
 // Add a new scraping source
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     base_url,
     article_selector,
@@ -38,34 +38,33 @@ router.post('/', (req, res) => {
     body_selector
   ];
 
-  db.run(
-    `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
+  try {
+    const result = await db.run(
+      `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to add source' });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
+      params
+    );
+    res.json({ id: result.lastID });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add source' });
+  }
 });
 
 // Delete a scraping source
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM sources WHERE id = ?', [id], function (err) {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to delete source' });
-    }
-    res.json({ deleted: this.changes });
-  });
+  try {
+    const result = await db.run('DELETE FROM sources WHERE id = ?', [id]);
+    res.json({ deleted: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete source' });
+  }
 });
 
 // Update a scraping source
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const {
     base_url,
@@ -90,17 +89,16 @@ router.put('/:id', (req, res) => {
     id,
   ];
 
-  db.run(
-    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to update source' });
-      }
-      res.json({ updated: this.changes });
-    }
-  );
+  try {
+    const result = await db.run(
+      `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
+      params
+    );
+    res.json({ updated: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update source' });
+  }
 });
 
 module.exports = router;
