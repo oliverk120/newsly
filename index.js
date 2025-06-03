@@ -1,16 +1,10 @@
 const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const { OpenAI } = require('openai');
-
-const { parseOpenAIResponse, getFirstSentence } = require('./lib/extractParties');
-const { runFilters } = require("./lib/filters");
-const { scrapeSource } = require("./lib/scraper");
+const db = require('./db');
+const { runFilters } = require('./lib/filters');
+const { scrapeSource } = require('./lib/scraper');
 
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,8 +14,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Initialize SQLite database
-const db = new sqlite3.Database(path.join(__dirname, 'raw_articles.db'));
-const processArticle = createProcessArticle(db, openai);
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS articles (
@@ -125,39 +117,11 @@ db.serialize(() => {
     }
   });
 });
+app.use('/articles', require('./routes/articles'));
+app.use('/sources', require('./routes/sources'));
+app.use('/filters', require('./routes/filters'));
 
-// Endpoint to get all articles
-app.get('/articles', (req, res) => {
-  const query = `
-    SELECT
-      a.id,
-      a.title,
-      a.description,
-      a.time,
-      a.link,
-      GROUP_CONCAT(f.id) as filter_ids,
-      GROUP_CONCAT(f.name) as filter_names
-    FROM articles a
-    LEFT JOIN article_filter_matches m ON a.id = m.article_id
-    LEFT JOIN filters f ON f.id = m.filter_id
-    GROUP BY a.id
-    ORDER BY a.created_at DESC`;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
-    rows.forEach(r => {
-      r.filter_ids = r.filter_ids
-        ? r.filter_ids.split(',').map(id => parseInt(id, 10))
-        : [];
-      r.filter_names = r.filter_names ? r.filter_names.split(',') : [];
-      r.matched = r.filter_ids.length > 0;
-    });
-    res.json(rows);
-  });
-});
 
 // Endpoint to get article statistics
 app.get('/stats', (req, res) => {
@@ -182,162 +146,6 @@ app.get('/stats', (req, res) => {
       }
       res.json({ total: row.total, latest: row.latest, bySource });
     });
-  });
-});
-
-// Endpoint to get all scraping sources
-app.get('/sources', (req, res) => {
-  db.all('SELECT * FROM sources', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve sources' });
-    }
-    res.json(rows);
-  });
-});
-
-// Endpoint to add a new scraping source
-app.post('/sources', (req, res) => {
-  const {
-    base_url,
-    article_selector,
-    title_selector,
-    description_selector,
-    time_selector,
-    link_selector,
-    image_selector,
-    body_selector
-  } = req.body;
-
-  const params = [
-    base_url,
-    article_selector,
-    title_selector,
-    description_selector,
-    time_selector,
-    link_selector,
-    image_selector,
-    body_selector
-  ];
-
-  db.run(
-    `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to add source' });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
-});
-
-// Endpoint to delete a scraping source
-app.delete('/sources/:id', (req, res) => {
-  const { id } = req.params;
-  db.run('DELETE FROM sources WHERE id = ?', [id], function (err) {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to delete source' });
-    }
-    res.json({ deleted: this.changes });
-  });
-});
-
-// Endpoint to update a scraping source
-app.put('/sources/:id', (req, res) => {
-  const { id } = req.params;
-  const {
-    base_url,
-    article_selector,
-    title_selector,
-    description_selector,
-    time_selector,
-    link_selector,
-    image_selector,
-    body_selector,
-  } = req.body;
-
-  const params = [
-    base_url,
-    article_selector,
-    title_selector,
-    description_selector,
-    time_selector,
-    link_selector,
-    image_selector,
-    body_selector,
-    id,
-  ];
-
-  db.run(
-    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to update source' });
-      }
-      res.json({ updated: this.changes });
-    }
-  );
-});
-
-// Get all filters
-app.get('/filters', (req, res) => {
-  db.all('SELECT * FROM filters', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve filters' });
-    }
-    res.json(rows);
-  });
-});
-
-// Add a filter
-app.post('/filters', (req, res) => {
-  const { name, type, value, active = 1 } = req.body;
-  db.run(
-    'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
-    [name, type, value, active],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to add filter' });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
-});
-
-// Update a filter
-app.put('/filters/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, type, value, active } = req.body;
-  db.run(
-    'UPDATE filters SET name = ?, type = ?, value = ?, active = ? WHERE id = ?',
-    [name, type, value, active, id],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to update filter' });
-      }
-      res.json({ updated: this.changes });
-    }
-  );
-});
-
-// Delete a filter
-app.delete('/filters/:id', (req, res) => {
-  const { id } = req.params;
-  db.run('DELETE FROM filters WHERE id = ?', [id], function (err) {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to delete filter' });
-    }
-    res.json({ deleted: this.changes });
   });
 });
 
@@ -437,50 +245,6 @@ app.get('/run-filters', async (req, res) => {
   }
 });
 
-// Get today's articles that matched the M&A filter
-app.get('/articles/mna-today', (req, res) => {
-  const query = `
-    SELECT a.id, a.title, a.description, a.time, a.link,
-           ae.body, ae.acquiror, ae.target
-    FROM articles a
-    JOIN article_filter_matches m ON a.id = m.article_id
-    JOIN filters f ON f.id = m.filter_id
-    LEFT JOIN article_enrichments ae ON a.id = ae.article_id
-    WHERE date(a.created_at) = date('now') AND f.name = 'M&A'
-    ORDER BY a.created_at DESC`;
-
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
-    res.json(rows);
-  });
-});
-
-// Enrich an article by scraping its body text
-app.post('/articles/:id/enrich', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const text = await fetchBody(db, id);
-    res.json({ success: true, body: text });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to enrich article' });
-  }
-});
-
-// Extract acquiror and target using GPT-3.5 from the first sentence
-app.post('/articles/:id/extract-parties', async (req, res) => {
-  const { id } = req.params;
-  try {
-    const { firstSentence, prompt, output, acquiror, target } = await extractParties(db, openai, id);
-    res.json({ success: true, firstSentence, prompt, output, acquiror, target });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to extract parties' });
-  }
-});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
