@@ -52,8 +52,18 @@ db.serialize(() => {
     deal_value TEXT,
     industry TEXT,
     extra TEXT,
+    body TEXT,
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
+
+  db.all('PRAGMA table_info(article_enrichments)', (err, rows) => {
+    if (!err) {
+      const hasBody = rows.some(r => r.name === 'body');
+      if (!hasBody) {
+        db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
+      }
+    }
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -478,6 +488,67 @@ app.get('/run-filters', async (req, res) => {
     console.error(err);
     logs.push(`Error: ${err.message}`);
     res.status(500).json({ error: 'Failed to run filters', logs });
+  }
+});
+
+// Get today's articles that matched the M&A filter
+app.get('/articles/mna-today', (req, res) => {
+  const query = `
+    SELECT a.id, a.title, a.description, a.time, a.link, ae.body
+    FROM articles a
+    JOIN article_filter_matches m ON a.id = m.article_id
+    JOIN filters f ON f.id = m.filter_id
+    LEFT JOIN article_enrichments ae ON a.id = ae.article_id
+    WHERE date(a.created_at) = date('now') AND f.name = 'M&A'
+    ORDER BY a.created_at DESC`;
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Failed to retrieve articles' });
+    }
+    res.json(rows);
+  });
+});
+
+// Enrich an article by scraping its body text
+app.post('/articles/:id/enrich', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const article = await new Promise((resolve, reject) => {
+      db.get('SELECT link FROM articles WHERE id = ?', [id], (err, row) => {
+        if (err) return reject(err);
+        resolve(row);
+      });
+    });
+    if (!article) return res.status(404).json({ error: 'Article not found' });
+
+    const response = await axios.get(article.link);
+    const $ = cheerio.load(response.data);
+    const container = $('#bw-release-story');
+    let text = container
+      .find('p, li')
+      .map((i, el) => $(el).text().trim())
+      .get()
+      .join('\n');
+    if (!text) {
+      text = container.text().trim();
+    }
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO article_enrichments (article_id, body)
+         VALUES (?, ?)
+         ON CONFLICT(article_id) DO UPDATE SET body = excluded.body`,
+        [id, text],
+        err => (err ? reject(err) : resolve())
+      );
+    });
+
+    res.json({ success: true, body: text });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to enrich article' });
   }
 });
 
