@@ -1,8 +1,8 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const { run, get, all } = require('./lib/db');
 const { OpenAI } = require('openai');
 const { parseOpenAIResponse, getFirstSentence } = require('./lib/extractParties');
 
@@ -15,11 +15,9 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-// Initialize SQLite database
-const db = new sqlite3.Database(path.join(__dirname, 'raw_articles.db'));
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS articles (
+// Initialize SQLite database tables
+async function initDatabase() {
+  await run(`CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     description TEXT,
@@ -29,7 +27,7 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS filters (
+  await run(`CREATE TABLE IF NOT EXISTS filters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     type TEXT NOT NULL, -- 'keyword' or 'embedding'
@@ -38,7 +36,7 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
+  await run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id INTEGER,
     filter_id INTEGER,
@@ -47,7 +45,7 @@ db.serialize(() => {
     FOREIGN KEY(filter_id) REFERENCES filters(id)
   )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
+  await run(`CREATE TABLE IF NOT EXISTS article_enrichments (
     article_id INTEGER PRIMARY KEY,
     embedding TEXT,
     is_mna INTEGER,
@@ -60,16 +58,12 @@ db.serialize(() => {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
-  db.all('PRAGMA table_info(article_enrichments)', (err, rows) => {
-    if (!err) {
-      const hasBody = rows.some(r => r.name === 'body');
-      if (!hasBody) {
-        db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
-      }
-    }
-  });
+  const aeCols = await all('PRAGMA table_info(article_enrichments)');
+  if (!aeCols.some(r => r.name === 'body')) {
+    await run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
+  }
 
-  db.run(`CREATE TABLE IF NOT EXISTS sources (
+  await run(`CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     base_url TEXT,
     article_selector TEXT,
@@ -81,48 +75,36 @@ db.serialize(() => {
     body_selector TEXT
   )`);
 
-  db.all('PRAGMA table_info(sources)', (err, rows) => {
-    if (!err) {
-      const hasBody = rows.some(r => r.name === 'body_selector');
-      if (!hasBody) {
-        db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
-      }
-    }
-  });
+  const srcCols = await all('PRAGMA table_info(sources)');
+  if (!srcCols.some(r => r.name === 'body_selector')) {
+    await run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
+  }
 
-  db.get('SELECT COUNT(*) as count FROM sources', (err, row) => {
-    if (err) {
-      return console.error('Failed to check sources table', err);
-    }
-    if (row.count === 0) {
-      const insert = `INSERT INTO sources
-        (base_url, article_selector, title_selector, description_selector,
-         time_selector, link_selector, image_selector, body_selector)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-      db.run(
-        insert,
-        [
-          'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
-          'div.col-sm-12.card',
-          'h3',
-          'p',
-          'h3 small',
-          'a.newsreleaseconsolidatelink',
-          null,
-          '#release-body'
-        ],
-        err2 => {
-          if (err2) {
-            console.error('Failed to insert default source', err2);
-          }
-        }
-      );
-    }
-  });
+  const row = await get('SELECT COUNT(*) as count FROM sources');
+  if (row.count === 0) {
+    const insert = `INSERT INTO sources
+      (base_url, article_selector, title_selector, description_selector,
+       time_selector, link_selector, image_selector, body_selector)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+    await run(insert, [
+      'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
+      'div.col-sm-12.card',
+      'h3',
+      'p',
+      'h3 small',
+      'a.newsreleaseconsolidatelink',
+      null,
+      '#release-body'
+    ]);
+  }
+}
+
+initDatabase().catch(err => {
+  console.error('Failed to initialize database', err);
 });
 
 // Endpoint to get all articles
-app.get('/articles', (req, res) => {
+app.get('/articles', async (req, res) => {
   const query = `
     SELECT
       a.id,
@@ -138,11 +120,8 @@ app.get('/articles', (req, res) => {
     GROUP BY a.id
     ORDER BY a.created_at DESC`;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
+  try {
+    const rows = await all(query, []);
     rows.forEach(r => {
       r.filter_ids = r.filter_ids
         ? r.filter_ids.split(',').map(id => parseInt(id, 10))
@@ -151,17 +130,16 @@ app.get('/articles', (req, res) => {
       r.matched = r.filter_ids.length > 0;
     });
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve articles' });
+  }
 });
 
 // Endpoint to get article statistics
-app.get('/stats', (req, res) => {
-  db.all('SELECT link FROM articles', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve stats' });
-    }
-
+app.get('/stats', async (req, res) => {
+  try {
+    const rows = await all('SELECT link FROM articles', []);
     const bySource = {};
     rows.forEach(r => {
       try {
@@ -170,29 +148,27 @@ app.get('/stats', (req, res) => {
       } catch (e) {}
     });
 
-    db.get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles', (err2, row) => {
-      if (err2) {
-        console.error(err2);
-        return res.status(500).json({ error: 'Failed to retrieve stats' });
-      }
-      res.json({ total: row.total, latest: row.latest, bySource });
-    });
-  });
+    const row = await get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles');
+    res.json({ total: row.total, latest: row.latest, bySource });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve stats' });
+  }
 });
 
 // Endpoint to get all scraping sources
-app.get('/sources', (req, res) => {
-  db.all('SELECT * FROM sources', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve sources' });
-    }
+app.get('/sources', async (req, res) => {
+  try {
+    const rows = await all('SELECT * FROM sources', []);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve sources' });
+  }
 });
 
 // Endpoint to add a new scraping source
-app.post('/sources', (req, res) => {
+app.post('/sources', async (req, res) => {
   const {
     base_url,
     article_selector,
@@ -215,34 +191,33 @@ app.post('/sources', (req, res) => {
     body_selector
   ];
 
-  db.run(
-    `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to add source' });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
+  try {
+    const result = await run(
+      `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      params
+    );
+    res.json({ id: result.lastID });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add source' });
+  }
 });
 
 // Endpoint to delete a scraping source
-app.delete('/sources/:id', (req, res) => {
+app.delete('/sources/:id', async (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM sources WHERE id = ?', [id], function (err) {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to delete source' });
-    }
-    res.json({ deleted: this.changes });
-  });
+  try {
+    const result = await run('DELETE FROM sources WHERE id = ?', [id]);
+    res.json({ deleted: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete source' });
+  }
 });
 
 // Endpoint to update a scraping source
-app.put('/sources/:id', (req, res) => {
+app.put('/sources/:id', async (req, res) => {
   const { id } = req.params;
   const {
     base_url,
@@ -267,83 +242,75 @@ app.put('/sources/:id', (req, res) => {
     id,
   ];
 
-  db.run(
-    `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
-    params,
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to update source' });
-      }
-      res.json({ updated: this.changes });
-    }
-  );
+  try {
+    const result = await run(
+      `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
+      params
+    );
+    res.json({ updated: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update source' });
+  }
 });
 
 // Get all filters
-app.get('/filters', (req, res) => {
-  db.all('SELECT * FROM filters', [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve filters' });
-    }
+app.get('/filters', async (req, res) => {
+  try {
+    const rows = await all('SELECT * FROM filters', []);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve filters' });
+  }
 });
 
 // Add a filter
-app.post('/filters', (req, res) => {
+app.post('/filters', async (req, res) => {
   const { name, type, value, active = 1 } = req.body;
-  db.run(
-    'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
-    [name, type, value, active],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to add filter' });
-      }
-      res.json({ id: this.lastID });
-    }
-  );
+  try {
+    const result = await run(
+      'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
+      [name, type, value, active]
+    );
+    res.json({ id: result.lastID });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to add filter' });
+  }
 });
 
 // Update a filter
-app.put('/filters/:id', (req, res) => {
+app.put('/filters/:id', async (req, res) => {
   const { id } = req.params;
   const { name, type, value, active } = req.body;
-  db.run(
-    'UPDATE filters SET name = ?, type = ?, value = ?, active = ? WHERE id = ?',
-    [name, type, value, active, id],
-    function (err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).json({ error: 'Failed to update filter' });
-      }
-      res.json({ updated: this.changes });
-    }
-  );
+  try {
+    const result = await run(
+      'UPDATE filters SET name = ?, type = ?, value = ?, active = ? WHERE id = ?',
+      [name, type, value, active, id]
+    );
+    res.json({ updated: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update filter' });
+  }
 });
 
 // Delete a filter
-app.delete('/filters/:id', (req, res) => {
+app.delete('/filters/:id', async (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM filters WHERE id = ?', [id], function (err) {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to delete filter' });
-    }
-    res.json({ deleted: this.changes });
-  });
+  try {
+    const result = await run('DELETE FROM filters WHERE id = ?', [id]);
+    res.json({ deleted: result.changes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete filter' });
+  }
 });
 
 async function runFilters(articleIds, logs) {
   if (!articleIds.length) return;
-  const filters = await new Promise((resolve, reject) => {
-    db.all('SELECT * FROM filters WHERE active = 1', [], (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+  const filters = await all('SELECT * FROM filters WHERE active = 1', []);
 
   if (!filters.length) {
     logs && logs.push('No active filters to run');
@@ -351,12 +318,7 @@ async function runFilters(articleIds, logs) {
   }
 
   for (const id of articleIds) {
-    const article = await new Promise((resolve, reject) => {
-      db.get('SELECT title, description FROM articles WHERE id = ?', [id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
+    const article = await get('SELECT title, description FROM articles WHERE id = ?', [id]);
     if (!article) continue;
 
     for (const filter of filters) {
@@ -368,13 +330,10 @@ async function runFilters(articleIds, logs) {
         const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
         const matched = keywords.some(kw => text.includes(kw));
         if (matched) {
-          await new Promise((resolve, reject) => {
-            db.run(
-              'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
-              [id, filter.id],
-              err => (err ? reject(err) : resolve())
-            );
-          });
+          await run(
+            'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
+            [id, filter.id]
+          );
         }
       } else if (filter.type === 'embedding') {
         // TODO: implement semantic filtering using embeddings
@@ -422,12 +381,7 @@ async function scrapeSource(source) {
 app.get('/scrape', async (req, res) => {
   const logs = [];
   try {
-    const sources = await new Promise((resolve, reject) => {
-      db.all('SELECT * FROM sources', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      });
-    });
+    const sources = await all('SELECT * FROM sources', []);
 
     logs.push(`Found ${sources.length} sources`);
 
@@ -445,18 +399,12 @@ app.get('/scrape', async (req, res) => {
         continue;
       }
 
-      const insertPromises = articles.map(a => {
-        return new Promise((resolve, reject) => {
-          db.run(
-            'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
-            [a.title, a.description, a.time, a.link, a.image],
-            function (err) {
-              if (err) return reject(err);
-              resolve({ changes: this.changes, id: this.lastID });
-            }
-          );
-        });
-      });
+      const insertPromises = articles.map(a =>
+        run(
+          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
+          [a.title, a.description, a.time, a.link, a.image]
+        )
+      );
 
       const results = await Promise.all(insertPromises);
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
@@ -487,18 +435,10 @@ app.get('/scrape', async (req, res) => {
 app.get('/run-filters', async (req, res) => {
   const logs = [];
   try {
-    const ids = await new Promise((resolve, reject) => {
-      db.all('SELECT id FROM articles', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows.map(r => r.id));
-      });
-    });
+    const rows = await all('SELECT id FROM articles', []);
+    const ids = rows.map(r => r.id);
 
-    await new Promise((resolve, reject) => {
-      db.run('DELETE FROM article_filter_matches', err =>
-        err ? reject(err) : resolve()
-      );
-    });
+    await run('DELETE FROM article_filter_matches');
     logs.push('Cleared previous filter matches');
 
     await runFilters(ids, logs);
@@ -511,7 +451,7 @@ app.get('/run-filters', async (req, res) => {
 });
 
 // Get today's articles that matched the M&A filter
-app.get('/articles/mna-today', (req, res) => {
+app.get('/articles/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.target
@@ -522,33 +462,23 @@ app.get('/articles/mna-today', (req, res) => {
     WHERE date(a.created_at) = date('now') AND f.name = 'M&A'
     ORDER BY a.created_at DESC`;
 
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Failed to retrieve articles' });
-    }
+  try {
+    const rows = await all(query, []);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve articles' });
+  }
 });
 
 // Enrich an article by scraping its body text
 app.post('/articles/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const article = await new Promise((resolve, reject) => {
-      db.get('SELECT link FROM articles WHERE id = ?', [id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
+    const article = await get('SELECT link FROM articles WHERE id = ?', [id]);
     if (!article) return res.status(404).json({ error: 'Article not found' });
 
-    const sources = await new Promise((resolve, reject) => {
-      db.all('SELECT * FROM sources', [], (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      });
-    });
+    const sources = await all('SELECT * FROM sources', []);
 
     let bodySelector = null;
     try {
@@ -601,15 +531,12 @@ app.post('/articles/:id/enrich', async (req, res) => {
       text = container.text().trim();
     }
 
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO article_enrichments (article_id, body)
-         VALUES (?, ?)
-         ON CONFLICT(article_id) DO UPDATE SET body = excluded.body`,
-        [id, text],
-        err => (err ? reject(err) : resolve())
-      );
-    });
+    await run(
+      `INSERT INTO article_enrichments (article_id, body)
+       VALUES (?, ?)
+       ON CONFLICT(article_id) DO UPDATE SET body = excluded.body`,
+      [id, text]
+    );
 
     res.json({ success: true, body: text });
   } catch (err) {
@@ -622,16 +549,10 @@ app.post('/articles/:id/enrich', async (req, res) => {
 app.post('/articles/:id/extract-parties', async (req, res) => {
   const { id } = req.params;
   try {
-    const row = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT a.title, e.body FROM articles a JOIN article_enrichments e ON a.id = e.article_id WHERE a.id = ?`,
-        [id],
-        (err, r) => {
-          if (err) return reject(err);
-          resolve(r);
-        }
-      );
-    });
+    const row = await get(
+      `SELECT a.title, e.body FROM articles a JOIN article_enrichments e ON a.id = e.article_id WHERE a.id = ?`,
+      [id]
+    );
     if (!row || !row.body) {
       return res.status(404).json({ error: 'Article text not found' });
     }
@@ -655,15 +576,12 @@ app.post('/articles/:id/extract-parties', async (req, res) => {
     const { acquiror, target } = parseOpenAIResponse(output);
     console.log('Conclusion:', { acquiror, target });
 
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO article_enrichments (article_id, acquiror, target)
-         VALUES (?, ?, ?)
-         ON CONFLICT(article_id) DO UPDATE SET acquiror = excluded.acquiror, target = excluded.target`,
-        [id, acquiror, target],
-        err => (err ? reject(err) : resolve())
-      );
-    });
+    await run(
+      `INSERT INTO article_enrichments (article_id, acquiror, target)
+       VALUES (?, ?, ?)
+       ON CONFLICT(article_id) DO UPDATE SET acquiror = excluded.acquiror, target = excluded.target`,
+      [id, acquiror, target]
+    );
 
     res.json({ success: true, firstSentence, prompt, output, acquiror, target });
   } catch (err) {
