@@ -1,8 +1,10 @@
 const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
 const path = require('path');
 const db = require('./db');
+const { runFilters } = require('./lib/filters');
+const { scrapeSource } = require('./lib/scraper');
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +14,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Initialize SQLite database
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,10 +117,11 @@ db.serialize(() => {
     }
   });
 });
-
 app.use('/articles', require('./routes/articles'));
 app.use('/sources', require('./routes/sources'));
 app.use('/filters', require('./routes/filters'));
+
+
 
 // Endpoint to get article statistics
 app.get('/stats', (req, res) => {
@@ -146,87 +150,8 @@ app.get('/stats', (req, res) => {
 });
 
 
-async function runFilters(articleIds, logs) {
-  if (!articleIds.length) return;
-  const filters = await new Promise((resolve, reject) => {
-    db.all('SELECT * FROM filters WHERE active = 1', [], (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
 
-  if (!filters.length) {
-    logs && logs.push('No active filters to run');
-    return;
-  }
 
-  for (const id of articleIds) {
-    const article = await new Promise((resolve, reject) => {
-      db.get('SELECT title, description FROM articles WHERE id = ?', [id], (err, row) => {
-        if (err) return reject(err);
-        resolve(row);
-      });
-    });
-    if (!article) continue;
-
-    for (const filter of filters) {
-      if (filter.type === 'keyword') {
-        const keywords = (filter.value || '')
-          .split(',')
-          .map(k => k.trim().toLowerCase())
-          .filter(Boolean);
-        const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
-        const matched = keywords.some(kw => text.includes(kw));
-        if (matched) {
-          await new Promise((resolve, reject) => {
-            db.run(
-              'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
-              [id, filter.id],
-              err => (err ? reject(err) : resolve())
-            );
-          });
-        }
-      } else if (filter.type === 'embedding') {
-        // TODO: implement semantic filtering using embeddings
-      }
-    }
-  }
-  logs && logs.push(`Ran ${filters.length} filters on ${articleIds.length} articles`);
-}
-
-async function scrapeSource(source) {
-  const response = await axios.get(source.base_url);
-  const $ = cheerio.load(response.data);
-
-  const articles = [];
-  $(source.article_selector).each((i, el) => {
-    const container = $(el);
-    let time = '';
-    if (source.time_selector) {
-      time = container.find(source.time_selector).text().trim();
-      container.find(source.time_selector).remove();
-    }
-    const title = container.find(source.title_selector).text().trim();
-    const description = source.description_selector
-      ? container.find(source.description_selector).text().trim()
-      : '';
-    let link = source.link_selector
-      ? container.find(source.link_selector).attr('href') || ''
-      : '';
-    if (link && !link.startsWith('http')) {
-      try {
-        link = new URL(link, source.base_url).href;
-      } catch (e) {}
-    }
-    const image = source.image_selector
-      ? container.find(source.image_selector).attr('src') || null
-      : null;
-
-    articles.push({ title, description, time, link, image });
-  });
-
-  return articles;
-}
 
 // Scrape endpoint
 app.get('/scrape', async (req, res) => {
@@ -274,7 +199,9 @@ app.get('/scrape', async (req, res) => {
       insertedTotal += inserted;
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
-        await runFilters(insertedIds, logs);
+
+        await runFilters(db, insertedIds, logs);
+
       }
       details.push({
         source_id: source.id,
@@ -311,7 +238,7 @@ app.get('/run-filters', async (req, res) => {
     });
     logs.push('Cleared previous filter matches');
 
-    await runFilters(ids, logs);
+    await runFilters(db, ids, logs);
     res.json({ processed: ids.length, logs });
   } catch (err) {
     console.error(err);
