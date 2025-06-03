@@ -454,6 +454,33 @@ app.get('/scrape', async (req, res) => {
   }
 });
 
+// Re-run filters for all existing articles
+app.get('/run-filters', async (req, res) => {
+  const logs = [];
+  try {
+    const ids = await new Promise((resolve, reject) => {
+      db.all('SELECT id FROM articles', [], (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows.map(r => r.id));
+      });
+    });
+
+    await new Promise((resolve, reject) => {
+      db.run('DELETE FROM article_filter_matches', err =>
+        err ? reject(err) : resolve()
+      );
+    });
+    logs.push('Cleared previous filter matches');
+
+    await runFilters(ids, logs);
+    res.json({ processed: ids.length, logs });
+  } catch (err) {
+    console.error(err);
+    logs.push(`Error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to run filters', logs });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -13,6 +13,7 @@
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
 
     <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">Scrape Articles</button>
+    <button id="runFiltersBtn" class="bg-purple-500 text-white px-4 py-2 rounded mb-4 ml-2">Run Filters</button>
     <div id="scrapeResults" class="mb-2 text-sm"></div>
     <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
 
@@ -140,6 +141,19 @@
         log.textContent = (data.logs || []).join('\n');
         loadArticles();
         loadStats();
+      });
+
+      document.getElementById('runFiltersBtn').addEventListener('click', async () => {
+        const log = document.getElementById('scrapeLog');
+        const div = document.getElementById('scrapeResults');
+        log.textContent = '';
+        div.textContent = '';
+
+        const res = await fetch('/run-filters');
+        const data = await res.json();
+        div.textContent = `Processed ${data.processed} articles`;
+        log.textContent = (data.logs || []).join('\n');
+        loadArticles();
       });
 
       loadSources();
