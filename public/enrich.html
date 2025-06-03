@@ -12,12 +12,15 @@
       <a href="/enrich.html" class="font-semibold">Today's M&A</a>
     </nav>
     <h1 class="text-2xl font-bold mb-4">Today's M&A Articles</h1>
+    <div id="actionResults" class="mb-2 text-sm"></div>
+    <pre id="actionLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
     <table class="table-auto w-full border-collapse">
       <thead>
         <tr>
           <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
           <th class="border px-2 py-1">Actions</th>
+          <th class="border px-2 py-1">Text</th>
         </tr>
       </thead>
       <tbody id="articlesBody"></tbody>
@@ -53,15 +56,25 @@
         document.querySelectorAll('.enrichBtn').forEach(btn => {
           btn.addEventListener('click', async e => {
             const id = e.target.getAttribute('data-id');
+            const log = document.getElementById('actionLog');
+            const results = document.getElementById('actionResults');
+            log.textContent = '';
+            results.textContent = '';
+            console.log('Enriching article', id);
             const resp = await fetch(`/articles/${id}/enrich`, { method: 'POST' });
             const data = await resp.json();
+            console.log('Enrich response', data);
             if (data.body) {
-              const wrapper = e.target.parentElement.querySelector('.article-body');
+              const wrapper = e.target.closest('tr').querySelector('.article-body');
               wrapper.innerHTML = formatBody(data.body);
               wrapper.classList.remove('hidden');
               e.target.textContent = 'Refresh Text';
               initToggles();
+              results.textContent = `Fetched ${data.body.length} characters for article ${id}`;
+            } else if (data.error) {
+              results.textContent = `Error: ${data.error}`;
             }
+            log.textContent = JSON.stringify(data, null, 2);
           });
         });
       }
@@ -79,7 +92,8 @@
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
-            `<td class="border px-2 py-1"><button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded mr-2">${btnLabel}</button><div class="article-body mt-2 ${hiddenClass}">${bodyHtml}</div></td>`;
+            `<td class="border px-2 py-1"><button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button></td>` +
+            `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
         });
         initButtons();
