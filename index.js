@@ -332,9 +332,13 @@ async function runFilters(articleIds, logs) {
 
     for (const filter of filters) {
       if (filter.type === 'keyword') {
-        const kw = (filter.value || '').toLowerCase();
+        const keywords = (filter.value || '')
+          .split(',')
+          .map(k => k.trim().toLowerCase())
+          .filter(Boolean);
         const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
-        if (kw && text.includes(kw)) {
+        const matched = keywords.some(kw => text.includes(kw));
+        if (matched) {
           await new Promise((resolve, reject) => {
             db.run(
               'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
