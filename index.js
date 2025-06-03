@@ -151,8 +151,6 @@ app.get('/stats', (req, res) => {
 
 
 
-
-
 // Scrape endpoint
 app.get('/scrape', async (req, res) => {
   const logs = [];
