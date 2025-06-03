@@ -105,10 +105,12 @@ app.get('/articles', (req, res) => {
       a.description,
       a.time,
       a.link,
-      EXISTS (
-        SELECT 1 FROM article_filter_matches m WHERE m.article_id = a.id
-      ) AS matched
+      GROUP_CONCAT(f.id) as filter_ids,
+      GROUP_CONCAT(f.name) as filter_names
     FROM articles a
+    LEFT JOIN article_filter_matches m ON a.id = m.article_id
+    LEFT JOIN filters f ON f.id = m.filter_id
+    GROUP BY a.id
     ORDER BY a.created_at DESC`;
 
   db.all(query, [], (err, rows) => {
@@ -116,6 +118,13 @@ app.get('/articles', (req, res) => {
       console.error(err);
       return res.status(500).json({ error: 'Failed to retrieve articles' });
     }
+    rows.forEach(r => {
+      r.filter_ids = r.filter_ids
+        ? r.filter_ids.split(',').map(id => parseInt(id, 10))
+        : [];
+      r.filter_names = r.filter_names ? r.filter_names.split(',') : [];
+      r.matched = r.filter_ids.length > 0;
+    });
     res.json(rows);
   });
 });
@@ -324,9 +333,8 @@ async function runFilters(articleIds, logs) {
     for (const filter of filters) {
       if (filter.type === 'keyword') {
         const kw = (filter.value || '').toLowerCase();
-        const title = (article.title || '').toLowerCase();
-        const desc = (article.description || '').toLowerCase();
-        if (kw && (title.includes(kw) || desc.includes(kw))) {
+        const text = `${article.title || ''} ${article.description || ''}`.toLowerCase();
+        if (kw && text.includes(kw)) {
           await new Promise((resolve, reject) => {
             db.run(
               'INSERT INTO article_filter_matches (article_id, filter_id) VALUES (?, ?)',
