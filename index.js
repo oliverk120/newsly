@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { OpenAI } = require('openai');
+const { parseOpenAIResponse } = require('./lib/extractParties');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -631,8 +632,14 @@ app.post('/articles/:id/extract-parties', async (req, res) => {
       return res.status(404).json({ error: 'Article text not found' });
     }
 
-    const firstSentence = row.body.split(/\.(\s|$)/)[0].replace(/\s+/g, ' ').trim();
+    const firstSentence = row.body
+      .split(/\.(\s|$)/)[0]
+      .replace(/\s+/g, ' ')
+      .trim();
     const prompt = `Extract the acquiror and target from this sentence. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Sentence: "${firstSentence}"`;
+
+    console.log('First sentence:', firstSentence);
+    console.log('Prompt:', prompt);
 
     const resp = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
@@ -640,15 +647,11 @@ app.post('/articles/:id/extract-parties', async (req, res) => {
       temperature: 0
     });
 
-    let acquiror = 'N/A';
-    let target = 'N/A';
-    try {
-      const parsed = JSON.parse(resp.choices[0].message.content.trim());
-      if (parsed.acquiror) acquiror = parsed.acquiror;
-      if (parsed.target) target = parsed.target;
-    } catch (e) {
-      console.error('Failed parsing OpenAI response', e);
-    }
+    const output = resp.choices[0].message.content.trim();
+    console.log('OpenAI output:', output);
+
+    const { acquiror, target } = parseOpenAIResponse(output);
+    console.log('Conclusion:', { acquiror, target });
 
     await new Promise((resolve, reject) => {
       db.run(
@@ -660,7 +663,7 @@ app.post('/articles/:id/extract-parties', async (req, res) => {
       );
     });
 
-    res.json({ success: true, acquiror, target });
+    res.json({ success: true, firstSentence, prompt, output, acquiror, target });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract parties' });
