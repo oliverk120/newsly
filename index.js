@@ -525,7 +525,28 @@ app.post('/articles/:id/enrich', async (req, res) => {
 
     const response = await axios.get(article.link);
     const $ = cheerio.load(response.data);
-    const container = $('#bw-release-story');
+
+    const selectors = [
+      '#bw-release-story',
+      '.bw-release-story',
+      '#release-body',
+      '[itemprop="articleBody"]',
+      '.article-content',
+      'article'
+    ];
+
+    let container = null;
+    for (const sel of selectors) {
+      const c = $(sel);
+      if (c.length) {
+        container = c;
+        break;
+      }
+    }
+    if (!container) {
+      container = $('body');
+    }
+
     let text = container
       .find('p, li')
       .map((i, el) => $(el).text().trim())
