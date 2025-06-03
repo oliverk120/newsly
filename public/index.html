@@ -74,10 +74,11 @@
         tbody.innerHTML = '';
         filters.forEach(f => {
           const tr = document.createElement('tr');
+          const cls = colorClasses[f.id % colorClasses.length];
           tr.innerHTML =
-            `<td class="border px-2 py-1">${f.name || ''}</td>` +
-            `<td class="border px-2 py-1">${f.type}</td>` +
-            `<td class="border px-2 py-1">${f.value || ''}</td>`;
+            `<td class="border px-2 py-1 ${cls}">${f.name || ''}</td>` +
+            `<td class="border px-2 py-1 ${cls}">${f.type}</td>` +
+            `<td class="border px-2 py-1 ${cls}">${f.value || ''}</td>`;
           tbody.appendChild(tr);
         });
       }
