@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Enriched Articles Database</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="p-4">
+    <nav class="mb-4 space-x-4 bg-gray-100 p-2 rounded">
+      <a href="/" class="text-blue-600 underline">Home</a>
+      <a href="/manage.html" class="text-blue-600 underline">Manage Sources, Filters &amp; Prompts</a>
+      <a href="/enrich.html" class="text-blue-600 underline">Enrich Articles</a>
+      <a href="/enriched.html" class="font-semibold">Enriched Database</a>
+      <a href="/semantic-search.html" class="text-blue-600 underline">Semantic Search</a>
+    </nav>
+    <h1 class="text-2xl font-bold mb-4">Enriched Articles Database</h1>
+
+    <div class="mb-4 space-x-2">
+      <label>Completeness:
+        <select id="levelSelect" class="border px-2 py-1">
+          <option value="all">All</option>
+          <option value="full">Fully Complete</option>
+          <option value="partial">Incomplete</option>
+        </select>
+      </label>
+      <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
+    </div>
+
+    <div id="stats" class="mb-2 text-sm"></div>
+
+    <table class="table-auto w-full border-collapse">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">#</th>
+          <th class="border px-2 py-1">Title</th>
+          <th class="border px-2 py-1">Acquiror</th>
+          <th class="border px-2 py-1">Seller</th>
+          <th class="border px-2 py-1">Target</th>
+          <th class="border px-2 py-1">Type</th>
+          <th class="border px-2 py-1">Location</th>
+          <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Completed</th>
+          <th class="border px-2 py-1">Text</th>
+        </tr>
+      </thead>
+      <tbody id="articlesBody"></tbody>
+    </table>
+    <script>
+      function escapeHtml(str) {
+        return str.replace(/[&<>]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t]));
+      }
+
+      function formatBody(text) {
+        const limit = 200;
+        text = text.replace(/\n+/g, '\n');
+        if (text.length <= limit) {
+          return `<div class="text-container"><span class="full">${escapeHtml(text)}</span></div>`;
+        }
+        const preview = escapeHtml(text.slice(0, limit)) + '...';
+        return `<div class="text-container"><span class="preview">${preview}</span><span class="full hidden">${escapeHtml(text)}</span> <a href="#" class="seeMore text-blue-600 underline">See more</a></div>`;
+      }
+
+      function initToggles() {
+        document.querySelectorAll('.seeMore').forEach(link => {
+          link.onclick = e => {
+            e.preventDefault();
+            const container = e.target.closest('.text-container');
+            container.querySelector('.preview').classList.toggle('hidden');
+            container.querySelector('.full').classList.toggle('hidden');
+            e.target.textContent = container.querySelector('.full').classList.contains('hidden') ? 'See more' : 'Hide';
+          };
+        });
+      }
+
+      async function loadArticles() {
+        const level = document.getElementById('levelSelect').value;
+        const res = await fetch('/articles/enriched-list?level=' + level);
+        const data = await res.json();
+        const tbody = document.getElementById('articlesBody');
+        tbody.innerHTML = '';
+        data.articles.forEach((a, idx) => {
+          const tr = document.createElement('tr');
+          const bodyHtml = a.body ? formatBody(a.body) : '';
+          const hiddenClass = a.body ? '' : 'hidden';
+          tr.innerHTML =
+            `<td class="border px-2 py-1">${idx + 1}</td>` +
+            `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
+            `<td class="border px-2 py-1">${a.acquiror || ''}</td>` +
+            `<td class="border px-2 py-1">${a.seller || ''}</td>` +
+            `<td class="border px-2 py-1">${a.target || ''}</td>` +
+            `<td class="border px-2 py-1">${a.transaction_type || ''}</td>` +
+            `<td class="border px-2 py-1">${a.location || ''}</td>` +
+            `<td class="border px-2 py-1">${a.article_date || ''}</td>` +
+            `<td class="border px-2 py-1">${a.completed || ''}</td>` +
+            `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
+          tbody.appendChild(tr);
+        });
+        document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
+        initToggles();
+      }
+
+      loadArticles();
+      document.getElementById('loadBtn').addEventListener('click', loadArticles);
+    </script>
+  </body>
+</html>

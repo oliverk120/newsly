@@ -117,6 +117,37 @@ router.get('/enrich-list', async (req, res) => {
   }
 });
 
+// Get enriched articles with stats
+router.get('/enriched-list', async (req, res) => {
+  const level = req.query.level || 'all';
+  const rows = await db.all(
+    `SELECT a.id, a.title, a.description, a.time, a.link,
+            ae.body, ae.acquiror, ae.seller, ae.target,
+            ae.location, ae.article_date, ae.completed,
+            ae.transaction_type
+       FROM articles a
+       JOIN article_enrichments ae ON a.id = ae.article_id
+      WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL
+      ORDER BY a.created_at DESC`
+  );
+
+  const required = ['body', 'embedding', 'date', 'location', 'parties'];
+  let full = 0;
+  let partial = 0;
+  const articles = [];
+  for (const r of rows) {
+    const completed = r.completed ? r.completed.split(',') : [];
+    const isFull = required.every(k => completed.includes(k));
+    if (isFull) full++; else partial++;
+    r.completed = completed.join(',');
+    if (level === 'full' && !isFull) continue;
+    if (level === 'partial' && isFull) continue;
+    articles.push(r);
+  }
+
+  res.json({ articles, stats: { total: full + partial, full, partial } });
+});
+
 // Enrich an article by scraping its body text and extracting date/location
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
