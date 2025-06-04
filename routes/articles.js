@@ -242,6 +242,35 @@ router.get('/semantic-search', async (req, res) => {
   res.json({ matches, others });
 });
 
+// Keyword search across title, description and body
+router.get('/keyword-search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json([]);
+
+  const pattern = `%${q
+    .replace(/([%_\\])/g, '\\$1')
+    .replace(/\*/g, '%')
+    .replace(/\?/g, '_')}%`;
+
+  try {
+    const rows = await db.all(
+      `SELECT a.id, a.title, a.description, a.link
+         FROM articles a
+         LEFT JOIN article_enrichments ae ON a.id = ae.article_id
+        WHERE a.title LIKE ? ESCAPE '\\'
+           OR a.description LIKE ? ESCAPE '\\'
+           OR ae.body LIKE ? ESCAPE '\\'
+        ORDER BY a.created_at DESC
+        LIMIT 50`,
+      [pattern, pattern, pattern]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to search articles' });
+  }
+});
+
 
 
 module.exports = router;

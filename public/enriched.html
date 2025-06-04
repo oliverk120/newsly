@@ -20,6 +20,11 @@
       <button id="searchBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Search</button>
     </div>
 
+    <div class="mb-4 space-x-2">
+      <input id="keywordInput" class="border px-2 py-1" placeholder="Keyword search" />
+      <button id="keywordBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Search</button>
+    </div>
+
     <table class="table-auto w-full border-collapse mb-4">
       <thead>
         <tr>
@@ -30,6 +35,17 @@
         </tr>
       </thead>
       <tbody id="resultsBody"></tbody>
+    </table>
+
+    <table class="table-auto w-full border-collapse mb-4">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">Title</th>
+          <th class="border px-2 py-1">Description</th>
+          <th class="border px-2 py-1">Link</th>
+        </tr>
+      </thead>
+      <tbody id="keywordBody"></tbody>
     </table>
 
     <div class="mb-4 space-x-2">
@@ -127,6 +143,15 @@
         return tr;
       }
 
+      function addKeywordRow(a) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          `<td class="border px-2 py-1">${a.title}</td>` +
+          `<td class="border px-2 py-1">${a.description || ''}</td>` +
+          `<td class="border px-2 py-1"><a href="${a.link}" target="_blank" class="text-blue-600 underline">Link</a></td>`;
+        return tr;
+      }
+
       async function doSearch() {
         const q = document.getElementById('queryInput').value.trim();
         const threshold = parseFloat(document.getElementById('thresholdInput').value) || 0.8;
@@ -140,9 +165,21 @@
         (data.others || []).forEach(a => tbody.appendChild(addRow(a, false)));
       }
 
+      async function doKeywordSearch() {
+        const q = document.getElementById('keywordInput').value.trim();
+        if (!q) return;
+        const params = new URLSearchParams({ q });
+        const res = await fetch('/articles/keyword-search?' + params.toString());
+        const data = await res.json();
+        const tbody = document.getElementById('keywordBody');
+        tbody.innerHTML = '';
+        data.forEach(a => tbody.appendChild(addKeywordRow(a)));
+      }
+
       loadArticles();
       document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('searchBtn').addEventListener('click', doSearch);
+      document.getElementById('keywordBtn').addEventListener('click', doKeywordSearch);
     </script>
   </body>
 </html>
