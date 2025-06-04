@@ -6,7 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="p-4">
-    <nav class="mb-4 space-x-4">
+    <nav class="mb-4 space-x-4 bg-gray-100 p-2 rounded">
       <a href="/" class="font-semibold">Home</a>
       <a href="/manage.html" class="text-blue-600 underline">Manage Sources, Filters & Prompts</a>
       <a href="/enrich.html" class="text-blue-600 underline">Enrich Articles</a>
@@ -14,14 +14,13 @@
     </nav>
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
 
-    <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded mb-4">Scrape Articles</button>
-    <button id="runFiltersBtn" class="bg-purple-500 text-white px-4 py-2 rounded mb-4 ml-2">Run Filters</button>
     <div id="scrapeResults" class="mb-2 text-sm"></div>
     <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
 
-    <div id="stats" class="mb-2"></div>
-
-    <h2 class="text-xl font-semibold mb-2">Sources</h2>
+    <div class="flex items-center mb-2 space-x-2">
+      <h2 class="text-xl font-semibold">Sources</h2>
+      <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded">Scrape Articles</button>
+    </div>
     <table class="table-auto w-full mb-6 border-collapse" id="sourcesTable">
       <thead>
         <tr>
@@ -31,7 +30,10 @@
       <tbody id="sourcesBody"></tbody>
     </table>
 
-    <h2 class="text-xl font-semibold mb-2">Active Filters</h2>
+    <div class="flex items-center mb-2 space-x-2">
+      <h2 class="text-xl font-semibold">Active Filters</h2>
+      <button id="runFiltersBtn" class="bg-purple-500 text-white px-4 py-2 rounded">Run Filters</button>
+    </div>
     <p class="text-sm text-gray-600 mb-2">Use <code>*</code> for any number of characters and <code>?</code> for a single character in keyword filters.</p>
     <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
       <thead>
@@ -45,6 +47,7 @@
     </table>
 
     <h2 class="text-xl font-semibold mb-2">Articles</h2>
+    <div id="stats" class="mb-2"></div>
     <table class="table-auto w-full border-collapse">
       <thead>
         <tr>
