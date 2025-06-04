@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get today's articles that matched the M&A filter
+// Get the most recent M&A articles
 router.get('/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
@@ -49,8 +49,9 @@ router.get('/mna-today', async (req, res) => {
     JOIN article_filter_matches m ON a.id = m.article_id
     JOIN filters f ON f.id = m.filter_id
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
-    WHERE date(a.created_at) = date('now') AND f.name = 'M&A'
-    ORDER BY a.created_at DESC`;
+    WHERE f.name = 'M&A'
+    ORDER BY a.created_at DESC
+    LIMIT 10`;
 
   try {
     const rows = await db.all(query);
