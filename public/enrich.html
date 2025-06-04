@@ -13,6 +13,11 @@
     </nav>
     <h1 class="text-2xl font-bold mb-4">Today's M&A Articles</h1>
 
+    <div class="mb-4 space-x-2">
+      <button id="getAllTextBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Get All Text</button>
+      <button id="getAllPartiesBtn" class="bg-purple-500 text-white px-3 py-1 rounded">Get All Parties</button>
+    </div>
+
     <div id="actionResults" class="mb-2 text-sm" style="min-height:1.25rem;"></div>
     <pre id="actionLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap" style="max-height:200px;overflow:auto;"></pre>
 
@@ -124,6 +129,65 @@
         });
       }
 
+      async function fetchAllBodies() {
+        const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
+        const log = document.getElementById('actionLog');
+        const results = document.getElementById('actionResults');
+        log.textContent = '';
+        results.textContent = '';
+        const summary = [];
+        for (const row of rows) {
+          const id = row.querySelector('.enrichBtn').getAttribute('data-id');
+          let data;
+          try {
+            const resp = await fetch(`/articles/${id}/enrich`, { method: 'POST' });
+            data = await resp.json();
+          } catch (err) {
+            data = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(data, null, 2);
+          if (data.body) {
+            const wrapper = row.querySelector('.article-body');
+            wrapper.innerHTML = formatBody(data.body);
+            wrapper.classList.remove('hidden');
+            row.querySelector('.enrichBtn').textContent = 'Refresh Text';
+            initToggles();
+            summary.push(`Article ${id}: ${data.body.length} chars`);
+          } else if (data.error) {
+            summary.push(`Article ${id}: ${data.error}`);
+          }
+        }
+        results.textContent = summary.join('; ');
+      }
+
+      async function extractAllParties() {
+        const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
+        const log = document.getElementById('actionLog');
+        const results = document.getElementById('actionResults');
+        log.textContent = '';
+        results.textContent = '';
+        const summary = [];
+        for (const row of rows) {
+          const id = row.querySelector('.extractBtn').getAttribute('data-id');
+          let data;
+          try {
+            const resp = await fetch(`/articles/${id}/extract-parties`, { method: 'POST' });
+            data = await resp.json();
+          } catch (err) {
+            data = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(data, null, 2);
+          if (data.acquiror !== undefined && data.target !== undefined) {
+            row.querySelector('.acquiror-cell').textContent = data.acquiror;
+            row.querySelector('.target-cell').textContent = data.target;
+            summary.push(`Article ${id}: parties updated`);
+          } else if (data.error) {
+            summary.push(`Article ${id}: ${data.error}`);
+          }
+        }
+        results.textContent = summary.join('; ');
+      }
+
       async function loadArticles() {
         let articles = [];
         try {
@@ -162,6 +226,8 @@
       }
 
       loadArticles();
+      document.getElementById('getAllTextBtn').addEventListener('click', fetchAllBodies);
+      document.getElementById('getAllPartiesBtn').addEventListener('click', extractAllParties);
     </script>
   </body>
 </html>
