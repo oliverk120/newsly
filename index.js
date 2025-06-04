@@ -53,6 +53,8 @@ async function initDb() {
     deal_value TEXT,
     industry TEXT,
     extra TEXT,
+    article_date TEXT,
+    location TEXT,
     body TEXT,
     completed TEXT,
     FOREIGN KEY(article_id) REFERENCES articles(id)
@@ -89,6 +91,14 @@ async function initDb() {
   const hasCompleted = aeInfo.some(r => r.name === 'completed');
   if (!hasCompleted) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN completed TEXT');
+  }
+  const hasDate = aeInfo.some(r => r.name === 'article_date');
+  if (!hasDate) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN article_date TEXT');
+  }
+  const hasLocation = aeInfo.some(r => r.name === 'location');
+  if (!hasLocation) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN location TEXT');
   }
 
   await db.run(`CREATE TABLE IF NOT EXISTS sources (
