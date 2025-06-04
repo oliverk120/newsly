@@ -23,6 +23,8 @@
       <input id="link_selector" class="border px-2 py-1 mr-2" placeholder="Link Selector" />
       <input id="image_selector" class="border px-2 py-1 mr-2" placeholder="Image Selector" />
       <input id="body_selector" class="border px-2 py-1 mr-2" placeholder="Body Selector" />
+      <input id="location_selector" class="border px-2 py-1 mr-2" placeholder="Location Selector" />
+      <input id="date_selector" class="border px-2 py-1 mr-2" placeholder="Date Selector" />
       <button type="submit" class="bg-green-500 text-white px-2 py-1 rounded">Add</button>
     </form>
 
@@ -37,6 +39,8 @@
           <th class="border px-2 py-1">Link Selector</th>
           <th class="border px-2 py-1">Image Selector</th>
           <th class="border px-2 py-1">Body Selector</th>
+          <th class="border px-2 py-1">Location Selector</th>
+          <th class="border px-2 py-1">Date Selector</th>
           <th class="border px-2 py-1">Actions</th>
         </tr>
       </thead>
@@ -94,6 +98,8 @@
            `<td contenteditable="true" class="border px-2 py-1">${s.link_selector || ''}</td>` +
            `<td contenteditable="true" class="border px-2 py-1">${s.image_selector || ''}</td>` +
            `<td contenteditable="true" class="border px-2 py-1">${s.body_selector || ''}</td>` +
+           `<td contenteditable="true" class="border px-2 py-1">${s.location_selector || ''}</td>` +
+           `<td contenteditable="true" class="border px-2 py-1">${s.date_selector || ''}</td>` +
            `<td class="border px-2 py-1">` +
             `<button data-id="${s.id}" class="saveSource bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
             `<button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
@@ -122,7 +128,9 @@
               time_selector: cells[4].innerText.trim(),
               link_selector: cells[5].innerText.trim(),
               image_selector: cells[6].innerText.trim(),
-              body_selector: cells[7].innerText.trim()
+              body_selector: cells[7].innerText.trim(),
+              location_selector: cells[8].innerText.trim(),
+              date_selector: cells[9].innerText.trim()
             };
             await fetch(`/sources/${id}`, {
               method: 'PUT',
@@ -193,7 +201,9 @@
           time_selector: document.getElementById('time_selector').value,
           link_selector: document.getElementById('link_selector').value,
           image_selector: document.getElementById('image_selector').value,
-          body_selector: document.getElementById('body_selector').value
+          body_selector: document.getElementById('body_selector').value,
+          location_selector: document.getElementById('location_selector').value,
+          date_selector: document.getElementById('date_selector').value
         };
         await fetch('/sources', {
           method: 'POST',
