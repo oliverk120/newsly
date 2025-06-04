@@ -95,12 +95,13 @@ router.get('/enrich-list', async (req, res) => {
   }
 });
 
-// Enrich an article by scraping its body text
+// Enrich an article by scraping its body text and extracting date/location
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await fetchBody(db, id);
-    res.json({ success: true, ...result });
+    const bodyRes = await fetchBody(db, id);
+    const dateLocRes = await extractDateLocation(db, id);
+    res.json({ success: true, body: bodyRes.body, ...dateLocRes });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to enrich article' });
