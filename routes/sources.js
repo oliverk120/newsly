@@ -24,7 +24,9 @@ router.post('/', async (req, res) => {
     time_selector,
     link_selector,
     image_selector,
-    body_selector
+    body_selector,
+    location_selector,
+    date_selector
   } = req.body;
 
   const params = [
@@ -35,13 +37,15 @@ router.post('/', async (req, res) => {
     time_selector,
     link_selector,
     image_selector,
-    body_selector
+    body_selector,
+    location_selector,
+    date_selector
   ];
 
   try {
     const result = await db.run(
-      `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector, location_selector, date_selector)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params
     );
     res.json({ id: result.lastID });
@@ -75,6 +79,8 @@ router.put('/:id', async (req, res) => {
     link_selector,
     image_selector,
     body_selector,
+    location_selector,
+    date_selector,
   } = req.body;
 
   const params = [
@@ -86,12 +92,14 @@ router.put('/:id', async (req, res) => {
     link_selector,
     image_selector,
     body_selector,
+    location_selector,
+    date_selector,
     id,
   ];
 
   try {
     const result = await db.run(
-      `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ? WHERE id = ?`,
+      `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ?, location_selector = ?, date_selector = ? WHERE id = ?`,
       params
     );
     res.json({ updated: result.changes });

@@ -115,7 +115,9 @@ async function initDb() {
     time_selector TEXT,
     link_selector TEXT,
     image_selector TEXT,
-    body_selector TEXT
+    body_selector TEXT,
+    location_selector TEXT,
+    date_selector TEXT
   )`);
 
   const srcInfo = await db.all('PRAGMA table_info(sources)');
@@ -123,13 +125,22 @@ async function initDb() {
   if (!hasBodySel) {
     await db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
   }
+  const hasLocationSel = srcInfo.some(r => r.name === 'location_selector');
+  if (!hasLocationSel) {
+    await db.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
+  }
+  const hasDateSel = srcInfo.some(r => r.name === 'date_selector');
+  if (!hasDateSel) {
+    await db.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
+  }
 
   const row = await db.get('SELECT COUNT(*) as count FROM sources');
   if (row.count === 0) {
     const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
-         time_selector, link_selector, image_selector, body_selector)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+         time_selector, link_selector, image_selector, body_selector,
+         location_selector, date_selector)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     await db.run(insert, [
       'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
       'div.col-sm-12.card',
@@ -138,7 +149,9 @@ async function initDb() {
       'h3 small',
       'a.newsreleaseconsolidatelink',
       null,
-      '#release-body'
+      '#release-body',
+      'span.xn-location',
+      'span.xn-chron'
     ]);
   }
 }
