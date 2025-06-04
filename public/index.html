@@ -33,6 +33,7 @@
     <div class="flex items-center mb-2 space-x-2">
       <h2 class="text-xl font-semibold">Active Filters</h2>
       <button id="runFiltersBtn" class="bg-purple-500 text-white px-4 py-2 rounded">Run Filters</button>
+      <button id="fullRunBtn" class="bg-green-600 text-white px-4 py-2 rounded">Scrape &amp; Enrich</button>
     </div>
     <p class="text-sm text-gray-600 mb-2">Use <code>*</code> for any number of characters and <code>?</code> for a single character in keyword filters.</p>
     <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
@@ -160,6 +161,20 @@
         div.textContent = `Processed ${data.processed} articles`;
         log.textContent = (data.logs || []).join('\n');
         loadArticles();
+      });
+
+      document.getElementById('fullRunBtn').addEventListener('click', async () => {
+        const log = document.getElementById('scrapeLog');
+        const div = document.getElementById('scrapeResults');
+        log.textContent = '';
+        div.textContent = 'Running full pipeline...';
+
+        const res = await fetch('/scrape-enrich');
+        const data = await res.json();
+        div.textContent = `Inserted ${data.inserted} new, enriched ${data.enriched}`;
+        log.textContent = (data.logs || []).join('\n');
+        loadArticles();
+        loadStats();
       });
 
       loadSources();
