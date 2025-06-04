@@ -75,7 +75,7 @@ async function initDb() {
       'INSERT INTO prompts (name, template) VALUES (?, ?)',
       [
         'extractParties',
-        'Extract the acquiror, seller, target and classify whether the article is about "M&A", "Financing" or "Other". Respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transaction_type":"Other"}. Text: "{text}"'
+        'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}. Text: "{text}"'
       ]
     );
   }
