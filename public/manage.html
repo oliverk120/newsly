@@ -2,16 +2,16 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>Manage Sources & Filters</title>
+  <title>Manage Sources, Filters & Prompts</title>
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body class="p-4">
     <nav class="mb-4 space-x-4">
       <a href="/" class="text-blue-600 underline">Home</a>
-      <a href="/manage.html" class="font-semibold">Manage Sources & Filters</a>
+      <a href="/manage.html" class="font-semibold">Manage Sources, Filters & Prompts</a>
       <a href="/enrich.html" class="text-blue-600 underline">Today's M&A</a>
     </nav>
-    <h1 class="text-2xl font-bold mb-4">Manage Sources & Filters</h1>
+    <h1 class="text-2xl font-bold mb-4">Manage Sources, Filters & Prompts</h1>
 
     <h2 class="text-xl font-semibold mb-2">Sources</h2>
     <form id="addSourceForm" class="mb-4">
@@ -67,6 +67,14 @@
       </thead>
       <tbody id="filtersBody"></tbody>
     </table>
+
+    <h2 class="text-xl font-semibold mb-2">Prompts</h2>
+    <div class="mb-4">
+      <label for="extractPartiesPrompt" class="block mb-1 font-medium">Extract Parties Prompt</label>
+      <textarea id="extractPartiesPrompt" class="border p-2 w-full h-32"></textarea>
+      <button id="savePromptBtn" class="mt-2 bg-green-500 text-white px-2 py-1 rounded">Save</button>
+      <div id="promptStatus" class="text-sm mt-1"></div>
+    </div>
 
     <script>
       async function loadSources() {
@@ -213,8 +221,26 @@
         loadFilters();
       });
 
+      async function loadPrompt() {
+        const res = await fetch('/prompts/extractParties');
+        if (!res.ok) return;
+        const { template } = await res.json();
+        document.getElementById('extractPartiesPrompt').value = template || '';
+      }
+
+      document.getElementById('savePromptBtn').addEventListener('click', async () => {
+        const template = document.getElementById('extractPartiesPrompt').value;
+        await fetch('/prompts/extractParties', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ template })
+        });
+        document.getElementById('promptStatus').textContent = 'Saved';
+      });
+
       loadSources();
       loadFilters();
+      loadPrompt();
     </script>
   </body>
 </html>
