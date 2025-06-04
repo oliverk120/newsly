@@ -3,11 +3,15 @@ const path = require('path');
 const db = require('./db');
 const { runFilters } = require('./lib/filters');
 const { scrapeSource } = require('./lib/scraper');
+const { OpenAI } = require('openai');
+const createPipeline = require('./lib/enrichment/pipeline');
 
 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const processArticle = createPipeline(db, openai);
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -239,6 +243,78 @@ app.get('/scrape', async (req, res) => {
     console.error(err);
     logs.push(`Error: ${err.message}`);
     res.status(500).json({ error: 'Scraping failed', logs });
+  }
+});
+
+// Scrape, filter and enrich newly added matching articles
+app.get('/scrape-enrich', async (req, res) => {
+  const logs = [];
+  try {
+    const sources = await db.all('SELECT * FROM sources');
+    logs.push(`Found ${sources.length} sources`);
+
+    let insertedTotal = 0;
+    let enrichedTotal = 0;
+    const details = [];
+
+    for (const source of sources) {
+      logs.push(`Fetching ${source.base_url}`);
+      let articles;
+      try {
+        articles = await scrapeSource(source);
+        logs.push(`Loaded ${articles.length} articles from ${source.base_url}`);
+      } catch (e) {
+        logs.push(`Failed to fetch ${source.base_url}: ${e.message}`);
+        continue;
+      }
+
+      const insertPromises = articles.map(a =>
+        db.run(
+          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
+          [a.title, a.description, a.time, a.link, a.image]
+        )
+      );
+
+      const results = await Promise.all(insertPromises);
+      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
+      const insertedIds = results.filter(r => r.changes > 0).map(r => r.id);
+      insertedTotal += inserted;
+      logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
+
+      if (insertedIds.length) {
+        await runFilters(db, insertedIds, logs);
+        const placeholders = insertedIds.map(() => '?').join(',');
+        const rows = await db.all(
+          `SELECT DISTINCT article_id FROM article_filter_matches WHERE article_id IN (${placeholders})`,
+          insertedIds
+        );
+        const matchedIds = rows.map(r => r.article_id);
+        for (const id of matchedIds) {
+          try {
+            await processArticle(id);
+            enrichedTotal++;
+            logs.push(`Enriched article ${id}`);
+          } catch (e) {
+            logs.push(`Failed to enrich article ${id}: ${e.message}`);
+          }
+        }
+      }
+
+      details.push({
+        source_id: source.id,
+        base_url: source.base_url,
+        scraped: articles.length,
+        inserted
+      });
+    }
+
+    logs.push(`Inserted total ${insertedTotal} new articles`);
+    logs.push(`Enriched total ${enrichedTotal} articles`);
+    res.json({ inserted: insertedTotal, enriched: enrichedTotal, details, logs });
+  } catch (err) {
+    console.error(err);
+    logs.push(`Error: ${err.message}`);
+    res.status(500).json({ error: 'Full scrape failed', logs });
   }
 });
 
