@@ -24,6 +24,7 @@
       <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
       <button id="getAllTextBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Get All Text</button>
       <button id="getAllPartiesBtn" class="bg-purple-500 text-white px-3 py-1 rounded">Get All Parties</button>
+      <button id="getAllDateLocBtn" class="bg-orange-500 text-white px-3 py-1 rounded">Get All Date/Location</button>
     </div>
 
     <div id="actionResults" class="mb-2 text-sm" style="min-height:1.25rem;"></div>
@@ -38,6 +39,8 @@
           <th class="border px-2 py-1">Acquiror</th>
           <th class="border px-2 py-1">Seller</th>
           <th class="border px-2 py-1">Target</th>
+          <th class="border px-2 py-1">Location</th>
+          <th class="border px-2 py-1">Date</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -102,6 +105,37 @@
                 e.target.closest('tr').querySelector('.completed-cell').textContent = data.completed;
               }
               results.textContent = `Fetched ${data.body.length} characters for article ${id}`;
+            } else if (data.error) {
+              results.textContent = `Error: ${data.error}`;
+            }
+            log.textContent = JSON.stringify(data, null, 2);
+          });
+        });
+
+        document.querySelectorAll('.extractDateBtn').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            const log = document.getElementById('actionLog');
+            const results = document.getElementById('actionResults');
+            log.textContent = '';
+            results.textContent = '';
+            let data;
+            try {
+              const resp = await fetch(`/articles/${id}/extract-date-location`, { method: 'POST' });
+              data = await resp.json();
+            } catch (err) {
+              console.error('Extract request failed', err);
+              results.textContent = 'Request failed';
+              return;
+            }
+            if (data.date !== undefined && data.location !== undefined) {
+              const row = e.target.closest('tr');
+              row.querySelector('.date-cell').textContent = data.date;
+              row.querySelector('.location-cell').textContent = data.location;
+              if (data.completed) {
+                row.querySelector('.completed-cell').textContent = data.completed;
+              }
+              results.textContent = `Extracted date/location for article ${id}`;
             } else if (data.error) {
               results.textContent = `Error: ${data.error}`;
             }
@@ -212,6 +246,37 @@
         results.textContent = summary.join('; ');
       }
 
+      async function extractAllDateLoc() {
+        const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
+        const log = document.getElementById('actionLog');
+        const results = document.getElementById('actionResults');
+        log.textContent = '';
+        results.textContent = '';
+        const summary = [];
+        for (const row of rows) {
+          const id = row.querySelector('.extractDateBtn').getAttribute('data-id');
+          let data;
+          try {
+            const resp = await fetch(`/articles/${id}/extract-date-location`, { method: 'POST' });
+            data = await resp.json();
+          } catch (err) {
+            data = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(data, null, 2);
+          if (data.date !== undefined && data.location !== undefined) {
+            row.querySelector('.date-cell').textContent = data.date;
+            row.querySelector('.location-cell').textContent = data.location;
+            if (data.completed) {
+              row.querySelector('.completed-cell').textContent = data.completed;
+            }
+            summary.push(`Article ${id}: date/location updated`);
+          } else if (data.error) {
+            summary.push(`Article ${id}: ${data.error}`);
+          }
+        }
+        results.textContent = summary.join('; ');
+      }
+
       async function loadArticles() {
         const limit = document.getElementById('limitSelect').value;
         const matched = document.getElementById('matchedOnly').checked;
@@ -240,6 +305,7 @@
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
             `<td class="border px-2 py-1 space-x-1">` +
               `<button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button>` +
+              `<button data-id="${a.id}" class="extractDateBtn bg-orange-500 text-white px-2 py-1 rounded">Date/Loc</button>` +
               `<button data-id="${a.id}" class="extractBtn bg-purple-500 text-white px-2 py-1 rounded">Extract Parties</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Deal Value</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Target Info</button>` +
@@ -248,6 +314,8 @@
             `<td class="border px-2 py-1 acquiror-cell">${a.acquiror || ''}</td>` +
             `<td class="border px-2 py-1 seller-cell">${a.seller || ''}</td>` +
             `<td class="border px-2 py-1 target-cell">${a.target || ''}</td>` +
+            `<td class="border px-2 py-1 location-cell">${a.location || ''}</td>` +
+            `<td class="border px-2 py-1 date-cell">${a.article_date || ''}</td>` +
             `<td class="border px-2 py-1 completed-cell">${a.completed || ''}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
@@ -260,6 +328,7 @@
       document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('getAllTextBtn').addEventListener('click', fetchAllBodies);
       document.getElementById('getAllPartiesBtn').addEventListener('click', extractAllParties);
+      document.getElementById('getAllDateLocBtn').addEventListener('click', extractAllDateLoc);
     </script>
   </body>
 </html>
