@@ -94,7 +94,7 @@ router.get('/enrich-list', async (req, res) => {
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
            ae.location, ae.article_date, ae.completed,
-           ae.transaction_type
+           ae.transaction_type, ae.embedding
     FROM articles a
     ${join}
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
@@ -103,6 +103,13 @@ router.get('/enrich-list', async (req, res) => {
 
   try {
     const rows = await db.all(query, [limit]);
+    rows.forEach(r => {
+      const completed = r.completed ? r.completed.split(',') : [];
+      if (r.embedding) {
+        if (!completed.includes('embedding')) completed.push('embedding');
+      }
+      r.completed = completed.join(',');
+    });
     res.json(rows);
   } catch (err) {
     console.error(err);

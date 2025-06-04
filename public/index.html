@@ -9,7 +9,7 @@
     <nav class="mb-4 space-x-4">
       <a href="/" class="font-semibold">Home</a>
       <a href="/manage.html" class="text-blue-600 underline">Manage Sources, Filters & Prompts</a>
-      <a href="/enrich.html" class="text-blue-600 underline">Today's M&A</a>
+      <a href="/enrich.html" class="text-blue-600 underline">Enrich Articles</a>
       <a href="/semantic-search.html" class="text-blue-600 underline">Semantic Search</a>
     </nav>
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
@@ -133,7 +133,7 @@
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
-        div.textContent = '';
+        div.textContent = 'Scraping started...';
 
         const res = await fetch('/scrape');
         const data = await res.json();
@@ -149,7 +149,7 @@
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
-        div.textContent = '';
+        div.textContent = 'Running filters...';
 
         const res = await fetch('/run-filters');
         const data = await res.json();
