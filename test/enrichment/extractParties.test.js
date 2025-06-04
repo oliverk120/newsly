@@ -2,12 +2,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { extractParties } = require('../../lib/extractParties');
 
-test('extracts acquiror and target using OpenAI output', async () => {
+test('extracts acquiror, seller and target using OpenAI output', async () => {
   const mockOpenAI = {
     chat: {
       completions: {
         create: async () => ({
-          choices: [{ message: { content: '{"acquiror":"Acme","target":"Foo"}' } }]
+          choices: [{ message: { content: '{"acquiror":"Acme","seller":"SellerCo","target":"Foo"}' } }]
         })
       }
     }
@@ -15,6 +15,7 @@ test('extracts acquiror and target using OpenAI output', async () => {
   const body = 'Acme Corp. today announced it will acquire Foo Inc.';
   const result = await extractParties(mockOpenAI, 'Acme buys Foo', body);
   assert.equal(result.acquiror, 'Acme');
+  assert.equal(result.seller, 'SellerCo');
   assert.equal(result.target, 'Foo');
 });
 
@@ -29,5 +30,6 @@ test('handles invalid OpenAI JSON', async () => {
   const body = 'No acquisition mentioned.';
   const result = await extractParties(mockOpenAI, 'Some title', body);
   assert.equal(result.acquiror, 'N/A');
+  assert.equal(result.seller, 'N/A');
   assert.equal(result.target, 'N/A');
 });
