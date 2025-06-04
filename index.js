@@ -56,6 +56,25 @@ async function initDb() {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
+  await db.run(`CREATE TABLE IF NOT EXISTS prompts (
+    name TEXT PRIMARY KEY,
+    template TEXT
+  )`);
+
+  const promptRow = await db.get(
+    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    ['extractParties']
+  );
+  if (promptRow.count === 0) {
+    await db.run(
+      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      [
+        'extractParties',
+        'Extract the acquiror and target from this text. If none are mentioned, respond with {"acquiror":"N/A","target":"N/A"}. Text: "{text}"'
+      ]
+    );
+  }
+
   const aeInfo = await db.all('PRAGMA table_info(article_enrichments)');
   const hasBody = aeInfo.some(r => r.name === 'body');
   if (!hasBody) {
@@ -103,6 +122,7 @@ initDb().catch(err => console.error('Failed to init db', err));
 app.use('/articles', require('./routes/articles'));
 app.use('/sources', require('./routes/sources'));
 app.use('/filters', require('./routes/filters'));
+app.use('/prompts', require('./routes/prompts'));
 
 
 
