@@ -1,7 +1,7 @@
 const express = require('express');
 const { OpenAI } = require('openai');
 const db = require('../db');
-const fetchBody = require('../lib/enrichment/fetchBody');
+const fetchAndStoreBody = require('../lib/enrichment/fetchAndStoreBody');
 const extractDateLocation = require('../lib/enrichment/extractDateLocation');
 const extractParties = require('../lib/enrichment/extractParties');
 
@@ -152,7 +152,7 @@ router.get('/enriched-list', async (req, res) => {
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const bodyRes = await fetchBody(db, openai, id);
+    const bodyRes = await fetchAndStoreBody(db, openai, id);
     const dateLocRes = await extractDateLocation(db, id);
     res.json({ success: true, body: bodyRes.body, ...dateLocRes });
   } catch (err) {
