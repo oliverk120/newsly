@@ -5,11 +5,12 @@ Newsly is a small Express application that scrapes news sources and stores artic
 ## Prerequisites
 
 - Node.js 18 or newer (the repo uses Node.js 22 via the `.replit` config)
-- If you plan to run enrichment routes, set the `OPENAI_API_KEY` environment variable
+- The server uses a local SQLite database at `raw_articles.db`
+- To run enrichment routes you must set the `OPENAI_API_KEY` environment variable
 
 ## Setup
 
-Install dependencies using npm:
+Install dependencies using npm before running the server:
 
 ```bash
 npm install
@@ -24,6 +25,11 @@ npm start
 ```
 
 The server listens on the port defined by `PORT` or defaults to `3000`.
+
+### Environment variables
+
+- `OPENAI_API_KEY` – required for enrichment endpoints
+- `PORT` – optional port number (defaults to `3000`)
 
 ## Project structure
 
@@ -42,7 +48,7 @@ Run all tests with:
 npm test
 ```
 
-At the time of writing all **8** tests pass.
+At the time of writing all **14** tests pass.
 
 ## Example commands
 
