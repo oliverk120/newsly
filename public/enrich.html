@@ -14,6 +14,14 @@
     <h1 class="text-2xl font-bold mb-4">Today's M&A Articles</h1>
 
     <div class="mb-4 space-x-2">
+      <label class="mr-2"><input type="checkbox" id="matchedOnly" /> Matched only</label>
+      <select id="limitSelect" class="border px-2 py-1 mr-2">
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="75">75</option>
+        <option value="100">100</option>
+      </select>
+      <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
       <button id="getAllTextBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Get All Text</button>
       <button id="getAllPartiesBtn" class="bg-purple-500 text-white px-3 py-1 rounded">Get All Parties</button>
     </div>
@@ -189,9 +197,14 @@
       }
 
       async function loadArticles() {
+        const limit = document.getElementById('limitSelect').value;
+        const matched = document.getElementById('matchedOnly').checked;
+        const params = new URLSearchParams({ limit });
+        if (matched) params.append('matched', '1');
+
         let articles = [];
         try {
-          const res = await fetch('/articles/mna-today');
+          const res = await fetch('/articles/enrich-list?' + params.toString());
           articles = await res.json();
         } catch (err) {
           console.error('Failed loading articles', err);
@@ -226,6 +239,7 @@
       }
 
       loadArticles();
+      document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('getAllTextBtn').addEventListener('click', fetchAllBodies);
       document.getElementById('getAllPartiesBtn').addEventListener('click', extractAllParties);
     </script>

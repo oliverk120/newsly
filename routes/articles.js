@@ -62,6 +62,34 @@ router.get('/mna-today', async (req, res) => {
   }
 });
 
+// Get articles for enrichment with optional filtering
+router.get('/enrich-list', async (req, res) => {
+  let limit = parseInt(req.query.limit, 10);
+  if (![25, 50, 75, 100].includes(limit)) {
+    limit = 25;
+  }
+  const matched = req.query.matched === '1' || req.query.matched === 'true';
+
+  const join = matched ? 'INNER JOIN article_filter_matches m ON a.id = m.article_id' : '';
+
+  const query = `
+    SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
+           ae.body, ae.acquiror, ae.target
+    FROM articles a
+    ${join}
+    LEFT JOIN article_enrichments ae ON a.id = ae.article_id
+    ORDER BY a.created_at DESC
+    LIMIT ?`;
+
+  try {
+    const rows = await db.all(query, [limit]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to retrieve articles' });
+  }
+});
+
 // Enrich an article by scraping its body text
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
