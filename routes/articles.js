@@ -5,6 +5,21 @@ const fetchBody = require('../lib/enrichment/fetchBody');
 const extractDateLocation = require('../lib/enrichment/extractDateLocation');
 const extractParties = require('../lib/enrichment/extractParties');
 
+function cosineSimilarity(a, b) {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    dot += x * y;
+    normA += x * x;
+    normB += y * y;
+  }
+  if (!normA || !normB) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -130,6 +145,57 @@ router.post('/:id/extract-parties', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract parties' });
   }
+});
+
+// Semantic search using OpenAI embeddings
+router.get('/semantic-search', async (req, res) => {
+  const query = (req.query.q || '').trim();
+  let threshold = parseFloat(req.query.threshold);
+  if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+    threshold = 0.8;
+  }
+  if (!query) {
+    return res.json({ matches: [], others: [] });
+  }
+
+  if (!openai || !openai.embeddings || typeof openai.embeddings.create !== 'function') {
+    return res.status(500).json({ error: 'Embedding not configured' });
+  }
+
+  let queryVec;
+  try {
+    const resp = await openai.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: query
+    });
+    queryVec = resp.data[0].embedding;
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to embed query' });
+  }
+
+  const rows = await db.all(
+    `SELECT a.id, a.title, a.description, a.link, ae.embedding
+     FROM articles a
+     JOIN article_enrichments ae ON a.id = ae.article_id
+     WHERE ae.embedding IS NOT NULL`
+  );
+
+  const scored = rows.map(r => {
+    let vec;
+    try {
+      vec = JSON.parse(r.embedding);
+    } catch (e) {
+      vec = null;
+    }
+    const score = vec ? cosineSimilarity(queryVec, vec) : 0;
+    return { id: r.id, title: r.title, description: r.description, link: r.link, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const matches = scored.filter(r => r.score >= threshold);
+  const others = scored.filter(r => r.score < threshold).slice(0, 2);
+
+  res.json({ matches, others });
 });
 
 
