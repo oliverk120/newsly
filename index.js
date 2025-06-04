@@ -75,7 +75,7 @@ async function initDb() {
       'INSERT INTO prompts (name, template) VALUES (?, ?)',
       [
         'extractParties',
-        'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}. Text: "{text}"'
+        'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Anything relating to one party buying, acquiring another is considered "M&A". The target and seller are often the same in an M&A transaction, but the target may also be select assets or a division of the seller. In a financing, the company issuing the financing is the seller. If none are mentioned, respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}.  Text: "{text}"'
       ]
     );
   }

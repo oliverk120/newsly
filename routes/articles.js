@@ -99,7 +99,7 @@ router.get('/enrich-list', async (req, res) => {
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const bodyRes = await fetchBody(db, id);
+    const bodyRes = await fetchBody(db, openai, id);
     const dateLocRes = await extractDateLocation(db, id);
     res.json({ success: true, body: bodyRes.body, ...dateLocRes });
   } catch (err) {
