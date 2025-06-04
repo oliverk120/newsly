@@ -41,6 +41,7 @@
           <th class="border px-2 py-1">Target</th>
           <th class="border px-2 py-1">Location</th>
           <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Type</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -178,6 +179,7 @@
             log.textContent = JSON.stringify(data, null, 2);
           });
         });
+
       }
 
       async function fetchAllBodies() {
@@ -277,6 +279,7 @@
         results.textContent = summary.join('; ');
       }
 
+
       async function loadArticles() {
         const limit = document.getElementById('limitSelect').value;
         const matched = document.getElementById('matchedOnly').checked;
@@ -316,6 +319,7 @@
             `<td class="border px-2 py-1 target-cell">${a.target || ''}</td>` +
             `<td class="border px-2 py-1 location-cell">${a.location || ''}</td>` +
             `<td class="border px-2 py-1 date-cell">${a.article_date || ''}</td>` +
+            `<td class="border px-2 py-1 type-cell">${a.transaction_type || ''}</td>` +
             `<td class="border px-2 py-1 completed-cell">${a.completed || ''}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);

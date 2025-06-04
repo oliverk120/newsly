@@ -56,6 +56,7 @@ async function initDb() {
     article_date TEXT,
     location TEXT,
     body TEXT,
+    transaction_type TEXT,
     completed TEXT,
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
@@ -74,7 +75,7 @@ async function initDb() {
       'INSERT INTO prompts (name, template) VALUES (?, ?)',
       [
         'extractParties',
-        'Extract the acquiror, seller and target from this text. The seller and acquiror may be the same, and the target may be select assets or a division. If none are mentioned, respond with {"acquiror":"N/A","seller":"N/A","target":"N/A"}. Text: "{text}"'
+        'Extract the acquiror, seller, target and classify whether the article is about "M&A", "Financing" or "Other". Respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transaction_type":"Other"}. Text: "{text}"'
       ]
     );
   }
@@ -99,6 +100,10 @@ async function initDb() {
   const hasLocation = aeInfo.some(r => r.name === 'location');
   if (!hasLocation) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN location TEXT');
+  }
+  const hasTx = aeInfo.some(r => r.name === 'transaction_type');
+  if (!hasTx) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT');
   }
 
   await db.run(`CREATE TABLE IF NOT EXISTS sources (

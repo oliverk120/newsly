@@ -46,7 +46,8 @@ router.get('/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date, ae.completed
+           ae.location, ae.article_date, ae.completed,
+           ae.transaction_type
     FROM articles a
     JOIN article_filter_matches m ON a.id = m.article_id
     JOIN filters f ON f.id = m.filter_id
@@ -77,7 +78,8 @@ router.get('/enrich-list', async (req, res) => {
   const query = `
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date, ae.completed
+           ae.location, ae.article_date, ae.completed,
+           ae.transaction_type
     FROM articles a
     ${join}
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
@@ -128,5 +130,7 @@ router.post('/:id/extract-parties', async (req, res) => {
     res.status(500).json({ error: 'Failed to extract parties' });
   }
 });
+
+
 
 module.exports = router;
