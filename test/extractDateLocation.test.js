@@ -9,6 +9,13 @@ test('extracts date and location from CNW style sentence', () => {
   assert.equal(res.location, 'EDMONTON, AB');
 });
 
+test('handles lines with a prefixed date', () => {
+  const text = 'Jun 03, 2025, 08:44 ET Share this article SANTO DOMINGO, Dominican Republic, June 3, 2025 /CNW/ - Something happened.';
+  const res = extractDateLocation(text);
+  assert.equal(res.date, 'June 3, 2025');
+  assert.equal(res.location, 'SANTO DOMINGO, Dominican Republic');
+});
+
 test('returns empty strings when pattern missing', () => {
   const res = extractDateLocation('No date or location here.');
   assert.equal(res.date, '');
