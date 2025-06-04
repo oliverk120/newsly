@@ -87,6 +87,7 @@ router.get('/enrich-list', async (req, res) => {
     limit = 25;
   }
   const matched = req.query.matched === '1' || req.query.matched === 'true';
+  const excludeFull = req.query.excludeFull === '1' || req.query.excludeFull === 'true';
 
   const join = matched ? 'INNER JOIN article_filter_matches m ON a.id = m.article_id' : '';
 
@@ -103,14 +104,19 @@ router.get('/enrich-list', async (req, res) => {
 
   try {
     const rows = await db.all(query, [limit]);
+    const required = ['body', 'embedding', 'date', 'location', 'parties'];
+    const filtered = [];
     rows.forEach(r => {
       const completed = r.completed ? r.completed.split(',') : [];
       if (r.embedding) {
         if (!completed.includes('embedding')) completed.push('embedding');
       }
+      const isFull = required.every(k => completed.includes(k));
       r.completed = completed.join(',');
+      if (excludeFull && isFull) return;
+      filtered.push(r);
     });
-    res.json(rows);
+    res.json(filtered);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to retrieve articles' });

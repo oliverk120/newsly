@@ -16,6 +16,7 @@
 
     <div class="mb-4 space-x-2">
       <label class="mr-2"><input type="checkbox" id="matchedOnly" /> Matched only</label>
+      <label class="mr-2"><input type="checkbox" id="excludeFull" /> Exclude Fully Complete</label>
       <select id="limitSelect" class="border px-2 py-1 mr-2">
         <option value="25">25</option>
         <option value="50">50</option>
@@ -236,8 +237,10 @@
       async function loadArticles() {
         const limit = document.getElementById('limitSelect').value;
         const matched = document.getElementById('matchedOnly').checked;
+        const excludeFull = document.getElementById('excludeFull').checked;
         const params = new URLSearchParams({ limit });
         if (matched) params.append('matched', '1');
+        if (excludeFull) params.append('excludeFull', '1');
 
         let articles = [];
         try {
