@@ -1,6 +1,6 @@
 # Newsly
 
-Newsly is a small Express application that scrapes news sources and stores articles in a SQLite database. Optional enrichment tasks use the OpenAI API to extract M&A details from the article text.
+Newsly is a small Express application that scrapes news sources and stores articles in a SQLite database. Optional enrichment tasks use the OpenAI API to extract M&A details. When extracting the acquiror, seller and target, the same request also classifies whether the article is about an "M&A" transaction, a "Financing" or "Other".
 
 ## Prerequisites
 
