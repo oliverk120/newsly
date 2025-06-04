@@ -51,3 +51,9 @@ At the time of writing all **8** tests pass.
 PORT=4000 npm start
 ```
 
+## Keyword filters
+
+Keyword filters support simple wildcards. Use `*` to match any sequence of
+characters and `?` to match a single character. For example, a filter value of
+`divest*` will match `divestiture` or `divests`.
+
