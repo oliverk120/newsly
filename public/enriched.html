@@ -60,6 +60,7 @@
           <th class="border px-2 py-1 w-1/3">Summary</th>
           <th class="border px-2 py-1">Clairfield Sector / Industry</th>
           <th class="border px-2 py-1">Location</th>
+          <th class="border px-2 py-1">Deal Size</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -155,6 +156,7 @@
             `<td class="border px-2 py-1 w-1/3">${summary}</td>` +
             `<td class="border px-2 py-1">${sectorHtml}</td>` +
             `<td class="border px-2 py-1">${a.location || ''}</td>` +
+            `<td class="border px-2 py-1">${a.deal_value || ''}</td>` +
             `<td class="border px-2 py-1">${completedHtml}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
@@ -165,12 +167,16 @@
       function updateSummary() {
         const container = document.getElementById('summaryPills');
         container.innerHTML = '';
+        const sectorCounts = {};
+        allArticles.forEach(a => {
+          if (a.sector) sectorCounts[a.sector] = (sectorCounts[a.sector] || 0) + 1;
+        });
         const groups = {
+          sector: Object.keys(sectorCounts),
           acquiror: [...new Set(allArticles.map(a => a.acquiror).filter(Boolean))],
           seller: [...new Set(allArticles.map(a => a.seller).filter(Boolean))],
           target: [...new Set(allArticles.map(a => a.target).filter(Boolean))],
           location: [...new Set(allArticles.map(a => a.location).filter(Boolean))],
-          sector: [...new Set(allArticles.map(a => a.sector).filter(Boolean))],
           industry: [...new Set(allArticles.map(a => a.industry).filter(Boolean))]
         };
         Object.entries(groups).forEach(([field, values]) => {
@@ -187,7 +193,8 @@
             const pill = document.createElement('span');
             if (field === 'sector') {
               const icon = sectorIcons[v] || '🏢';
-              pill.innerHTML = `${icon} ${v}`;
+              const count = sectorCounts[v] || 0;
+              pill.innerHTML = `${icon} ${v} (${count})`;
             } else {
               pill.textContent = v;
             }

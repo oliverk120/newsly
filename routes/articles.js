@@ -135,7 +135,7 @@ router.get('/enriched-list', async (req, res) => {
   const rows = await db.all(
     `SELECT a.id, a.title, a.description, a.time, a.link,
             ae.body, ae.acquiror, ae.seller, ae.target,
-            ae.location, ae.article_date, ae.completed,
+            ae.deal_value, ae.location, ae.article_date, ae.completed,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
        FROM articles a
