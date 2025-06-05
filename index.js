@@ -221,7 +221,7 @@ app.get('/scrape', async (req, res) => {
 
       const results = await Promise.all(insertPromises);
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
-      const insertedIds = results.filter(r => r.changes > 0).map(r => r.id);
+      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
       insertedTotal += inserted;
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
@@ -277,7 +277,7 @@ app.get('/scrape-enrich', async (req, res) => {
 
       const results = await Promise.all(insertPromises);
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
-      const insertedIds = results.filter(r => r.changes > 0).map(r => r.id);
+      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
       insertedTotal += inserted;
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
 
