@@ -63,6 +63,9 @@
           <th class="border px-2 py-1">Type</th>
           <th class="border px-2 py-1">Location</th>
           <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Summary</th>
+          <th class="border px-2 py-1">Sector</th>
+          <th class="border px-2 py-1">Industry</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -128,6 +131,9 @@
             `<td class="border px-2 py-1">${a.transaction_type || ''}</td>` +
             `<td class="border px-2 py-1">${a.location || ''}</td>` +
             `<td class="border px-2 py-1">${a.article_date || ''}</td>` +
+            `<td class="border px-2 py-1">${a.summary || ''}</td>` +
+            `<td class="border px-2 py-1">${a.sector || ''}</td>` +
+            `<td class="border px-2 py-1">${a.industry || ''}</td>` +
             `<td class="border px-2 py-1">${a.completed || ''}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);

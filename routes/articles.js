@@ -100,7 +100,8 @@ router.get('/enrich-list', async (req, res) => {
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
            ae.location, ae.article_date, ae.completed,
-           ae.transaction_type, ae.embedding, ae.log
+           ae.transaction_type, ae.embedding, ae.log,
+           ae.summary, ae.sector, ae.industry
     FROM articles a
     ${join}
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
@@ -135,7 +136,8 @@ router.get('/enriched-list', async (req, res) => {
     `SELECT a.id, a.title, a.description, a.time, a.link,
             ae.body, ae.acquiror, ae.seller, ae.target,
             ae.location, ae.article_date, ae.completed,
-            ae.transaction_type, ae.log
+            ae.transaction_type, ae.log,
+            ae.summary, ae.sector, ae.industry
        FROM articles a
        JOIN article_enrichments ae ON a.id = ae.article_id
       WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL
