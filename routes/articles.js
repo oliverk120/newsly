@@ -211,6 +211,19 @@ router.post('/:id/summarize', async (req, res) => {
   }
 });
 
+// Extract deal value from the full text and improve location using GPT
+const extractValueAndLocation = require('../lib/enrichment/extractValueAndLocation');
+router.post('/:id/extract-value-location', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await extractValueAndLocation(db, configDb, openai, id);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to extract value/location' });
+  }
+});
+
 // Semantic search using OpenAI embeddings
 router.get('/semantic-search', async (req, res) => {
   const query = (req.query.q || '').trim();
