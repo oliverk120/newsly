@@ -57,15 +57,10 @@
         <tr>
           <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
-          <th class="border px-2 py-1">Acquiror</th>
-          <th class="border px-2 py-1">Seller</th>
-          <th class="border px-2 py-1">Target</th>
-          <th class="border px-2 py-1">Type</th>
+          <th class="border px-2 py-1">Deal</th>
+          <th class="border px-2 py-1 w-1/3">Summary</th>
+          <th class="border px-2 py-1">Sector / Industry</th>
           <th class="border px-2 py-1">Location</th>
-          <th class="border px-2 py-1">Date</th>
-          <th class="border px-2 py-1">Summary</th>
-          <th class="border px-2 py-1">Sector</th>
-          <th class="border px-2 py-1">Industry</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -99,6 +94,44 @@
         });
       }
 
+      function formatTombstone(a) {
+        const acq = a.acquiror && a.acquiror !== 'N/A' ? escapeHtml(a.acquiror) : '';
+        const seller = a.seller && a.seller !== 'N/A' ? escapeHtml(a.seller) : '';
+        const target = a.target && a.target !== 'N/A' ? escapeHtml(a.target) : '';
+        if (a.transaction_type === 'Financing') {
+          if (acq) return `${seller || target} raised financing from ${acq}`;
+          return `${seller || target} raised financing`;
+        }
+        let text = `${acq}<br>acquired ${target}`;
+        if (seller && target && seller !== target) text += ` from ${seller}`;
+        return text;
+      }
+
+      const sectorIcons = {
+        Healthcare: '⚕️',
+        Energy: '⚡',
+        Industrials: '🏭',
+        Consumer: '🛒',
+        'Financial Services': '💰',
+        TMT: '💻'
+      };
+
+      function formatSectorIndustry(a) {
+        if (!a.sector && !a.industry) return '';
+        const icon = sectorIcons[a.sector] || '🏢';
+        const sector = a.sector ? escapeHtml(a.sector) : '';
+        const industry = a.industry ? escapeHtml(a.industry) : '';
+        return `${icon} ${sector}<br>${industry}`;
+      }
+
+      function formatCompleted(str) {
+        const types = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
+        const done = str ? str.split(',') : [];
+        return types
+          .map(t => `<div>${t}: ${done.includes(t) ? '✓' : ''}</div>`)
+          .join('');
+      }
+
       let allArticles = [];
       const filters = { keyword: '', acquiror: '', seller: '', target: '', location: '', sector: '', industry: '' };
 
@@ -124,19 +157,17 @@
           const tr = document.createElement('tr');
           const bodyHtml = a.body ? formatBody(a.body) : '';
           const hiddenClass = a.body ? '' : 'hidden';
+          const tombstone = formatTombstone(a);
+          const sectorHtml = formatSectorIndustry(a);
+          const completedHtml = formatCompleted(a.completed);
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">${a.title}</a></td>` +
-            `<td class="border px-2 py-1">${a.acquiror || ''}</td>` +
-            `<td class="border px-2 py-1">${a.seller || ''}</td>` +
-            `<td class="border px-2 py-1">${a.target || ''}</td>` +
-            `<td class="border px-2 py-1">${a.transaction_type || ''}</td>` +
+            `<td class="border px-2 py-1">${tombstone}</td>` +
+            `<td class="border px-2 py-1 w-1/3">${a.summary || ''}</td>` +
+            `<td class="border px-2 py-1">${sectorHtml}</td>` +
             `<td class="border px-2 py-1">${a.location || ''}</td>` +
-            `<td class="border px-2 py-1">${a.article_date || ''}</td>` +
-            `<td class="border px-2 py-1">${a.summary || ''}</td>` +
-            `<td class="border px-2 py-1">${a.sector || ''}</td>` +
-            `<td class="border px-2 py-1">${a.industry || ''}</td>` +
-            `<td class="border px-2 py-1">${a.completed || ''}</td>` +
+            `<td class="border px-2 py-1">${completedHtml}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
         });
