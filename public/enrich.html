@@ -15,8 +15,8 @@
     <h1 class="text-2xl font-bold mb-4">Enrich Articles</h1>
 
     <div class="mb-4">
-      <button id="fullRunBtn" class="bg-green-600 text-white px-4 py-2 rounded">Run Full Pipeline</button>
-      <p class="text-sm text-gray-600 mt-1">Scrapes new articles, runs filters and enriches the matches.</p>
+      <button id="fullRunBtn" class="bg-green-600 text-white px-4 py-2 rounded">Run Enrichment Pipeline</button>
+      <p class="text-sm text-gray-600 mt-1">Runs enrichment steps for the loaded articles.</p>
     </div>
 
     <div class="mb-4 space-x-2">
@@ -446,13 +446,13 @@
         const log = document.getElementById('actionLog');
         const div = document.getElementById('actionResults');
         log.textContent = '';
-        div.textContent = 'Running full pipeline...';
+        div.textContent = 'Running enrichment pipeline...';
 
-        const res = await fetch('/scrape-enrich');
-        const data = await res.json();
-        div.textContent = `Inserted ${data.inserted} new, enriched ${data.enriched}`;
-        log.textContent = (data.logs || []).join('\n');
-        loadArticles();
+        await fetchAllBodies();
+        await extractAllParties();
+        await summarizeAll();
+
+        div.textContent = 'Enrichment pipeline completed';
       });
     </script>
   </body>
