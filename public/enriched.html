@@ -100,7 +100,7 @@
       }
 
       let allArticles = [];
-      const filters = { keyword: '', acquiror: '', seller: '', target: '', location: '' };
+      const filters = { keyword: '', acquiror: '', seller: '', target: '', location: '', sector: '', industry: '' };
 
       function renderArticles() {
         const tbody = document.getElementById('articlesBody');
@@ -111,6 +111,8 @@
           if (filters.seller && a.seller !== filters.seller) return false;
           if (filters.target && a.target !== filters.target) return false;
           if (filters.location && a.location !== filters.location) return false;
+          if (filters.sector && a.sector !== filters.sector) return false;
+          if (filters.industry && a.industry !== filters.industry) return false;
           if (kw) {
             const text = `${a.title} ${a.description || ''} ${a.body || ''}`.toLowerCase();
             if (!text.includes(kw)) return false;
@@ -148,7 +150,9 @@
           acquiror: [...new Set(allArticles.map(a => a.acquiror).filter(Boolean))],
           seller: [...new Set(allArticles.map(a => a.seller).filter(Boolean))],
           target: [...new Set(allArticles.map(a => a.target).filter(Boolean))],
-          location: [...new Set(allArticles.map(a => a.location).filter(Boolean))]
+          location: [...new Set(allArticles.map(a => a.location).filter(Boolean))],
+          sector: [...new Set(allArticles.map(a => a.sector).filter(Boolean))],
+          industry: [...new Set(allArticles.map(a => a.industry).filter(Boolean))]
         };
         Object.entries(groups).forEach(([field, values]) => {
           if (!values.length) return;
