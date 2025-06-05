@@ -85,6 +85,20 @@ async function initDb() {
     );
   }
 
+  const sumRow = await configDb.get(
+    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    ['summarizeArticle']
+  );
+  if (sumRow.count === 0) {
+    await configDb.run(
+      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      [
+        'summarizeArticle',
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Respond with JSON {"summary":"...","sector":"...","industry":"..."}. Text: "{text}"'
+      ]
+    );
+  }
+
   const aeInfo = await db.all('PRAGMA table_info(article_enrichments)');
   const hasBody = aeInfo.some(r => r.name === 'body');
   if (!hasBody) {
@@ -113,6 +127,14 @@ async function initDb() {
   const hasLog = aeInfo.some(r => r.name === 'log');
   if (!hasLog) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
+  }
+  const hasSummary = aeInfo.some(r => r.name === 'summary');
+  if (!hasSummary) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN summary TEXT');
+  }
+  const hasSector = aeInfo.some(r => r.name === 'sector');
+  if (!hasSector) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN sector TEXT');
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (

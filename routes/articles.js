@@ -196,6 +196,19 @@ router.post('/:id/extract-parties', async (req, res) => {
   }
 });
 
+// Summarize article and classify sector/industry using GPT
+const summarizeArticle = require('../lib/enrichment/summarizeArticle');
+router.post('/:id/summarize', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await summarizeArticle(db, configDb, openai, id);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to summarize article' });
+  }
+});
+
 // Semantic search using OpenAI embeddings
 router.get('/semantic-search', async (req, res) => {
   const query = (req.query.q || '').trim();
