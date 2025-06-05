@@ -21,9 +21,10 @@
     </div>
 
     <div class="mb-4 space-x-2">
-      <input id="keywordInput" class="border px-2 py-1" placeholder="Keyword search" />
-      <button id="keywordBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Search</button>
+      <input id="filterInput" class="border px-2 py-1" placeholder="Filter keywords" />
     </div>
+
+    <div id="summaryPills" class="mb-4 flex flex-wrap gap-2"></div>
 
     <table class="table-auto w-full border-collapse mb-4">
       <thead>
@@ -37,16 +38,6 @@
       <tbody id="resultsBody"></tbody>
     </table>
 
-    <table class="table-auto w-full border-collapse mb-4">
-      <thead>
-        <tr>
-          <th class="border px-2 py-1">Title</th>
-          <th class="border px-2 py-1">Description</th>
-          <th class="border px-2 py-1">Link</th>
-        </tr>
-      </thead>
-      <tbody id="keywordBody"></tbody>
-    </table>
 
     <div class="mb-4 space-x-2">
       <label>Completeness:
@@ -105,13 +96,26 @@
         });
       }
 
-      async function loadArticles() {
-        const level = document.getElementById('levelSelect').value;
-        const res = await fetch('/articles/enriched-list?level=' + level);
-        const data = await res.json();
+      let allArticles = [];
+      const filters = { keyword: '', acquiror: '', seller: '', target: '', location: '' };
+
+      function renderArticles() {
         const tbody = document.getElementById('articlesBody');
         tbody.innerHTML = '';
-        data.articles.forEach((a, idx) => {
+        const kw = filters.keyword.toLowerCase();
+        const rows = allArticles.filter(a => {
+          if (filters.acquiror && a.acquiror !== filters.acquiror) return false;
+          if (filters.seller && a.seller !== filters.seller) return false;
+          if (filters.target && a.target !== filters.target) return false;
+          if (filters.location && a.location !== filters.location) return false;
+          if (kw) {
+            const text = `${a.title} ${a.description || ''} ${a.body || ''}`.toLowerCase();
+            if (!text.includes(kw)) return false;
+          }
+          return true;
+        });
+
+        rows.forEach((a, idx) => {
           const tr = document.createElement('tr');
           const bodyHtml = a.body ? formatBody(a.body) : '';
           const hiddenClass = a.body ? '' : 'hidden';
@@ -128,8 +132,59 @@
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
         });
-        document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
         initToggles();
+      }
+
+      function updateSummary() {
+        const container = document.getElementById('summaryPills');
+        container.innerHTML = '';
+        const groups = {
+          acquiror: [...new Set(allArticles.map(a => a.acquiror).filter(Boolean))],
+          seller: [...new Set(allArticles.map(a => a.seller).filter(Boolean))],
+          target: [...new Set(allArticles.map(a => a.target).filter(Boolean))],
+          location: [...new Set(allArticles.map(a => a.location).filter(Boolean))]
+        };
+        Object.entries(groups).forEach(([field, values]) => {
+          if (!values.length) return;
+          const label = document.createElement('span');
+          label.className = 'font-semibold mr-2';
+          label.textContent = field.charAt(0).toUpperCase() + field.slice(1) + ':';
+          container.appendChild(label);
+          values.slice(0, 10).forEach(v => {
+            const pill = document.createElement('span');
+            pill.textContent = v;
+            pill.dataset.field = field;
+            pill.dataset.value = v;
+            pill.className = 'cursor-pointer bg-gray-200 rounded-full px-2 py-1 text-sm';
+            pill.addEventListener('click', () => {
+              const cur = filters[field] === v;
+              filters[field] = cur ? '' : v;
+              container.querySelectorAll(`span[data-field="${field}"]`).forEach(p => {
+                p.classList.remove('bg-blue-500', 'text-white');
+                p.classList.add('bg-gray-200');
+              });
+              if (!cur) {
+                pill.classList.remove('bg-gray-200');
+                pill.classList.add('bg-blue-500', 'text-white');
+              }
+              renderArticles();
+            });
+            container.appendChild(pill);
+          });
+          const spacer = document.createElement('span');
+          spacer.className = 'w-full';
+          container.appendChild(spacer);
+        });
+      }
+
+      async function loadArticles() {
+        const level = document.getElementById('levelSelect').value;
+        const res = await fetch('/articles/enriched-list?level=' + level);
+        const data = await res.json();
+        allArticles = data.articles;
+        document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
+        updateSummary();
+        renderArticles();
       }
 
       function addRow(a, matched) {
@@ -139,15 +194,6 @@
           `<td class="border px-2 py-1">${a.title}</td>` +
           `<td class="border px-2 py-1">${a.description || ''}</td>` +
           `<td class="border px-2 py-1">${a.score.toFixed(3)}</td>` +
-          `<td class="border px-2 py-1"><a href="${a.link}" target="_blank" class="text-blue-600 underline">Link</a></td>`;
-        return tr;
-      }
-
-      function addKeywordRow(a) {
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-          `<td class="border px-2 py-1">${a.title}</td>` +
-          `<td class="border px-2 py-1">${a.description || ''}</td>` +
           `<td class="border px-2 py-1"><a href="${a.link}" target="_blank" class="text-blue-600 underline">Link</a></td>`;
         return tr;
       }
@@ -165,21 +211,13 @@
         (data.others || []).forEach(a => tbody.appendChild(addRow(a, false)));
       }
 
-      async function doKeywordSearch() {
-        const q = document.getElementById('keywordInput').value.trim();
-        if (!q) return;
-        const params = new URLSearchParams({ q });
-        const res = await fetch('/articles/keyword-search?' + params.toString());
-        const data = await res.json();
-        const tbody = document.getElementById('keywordBody');
-        tbody.innerHTML = '';
-        data.forEach(a => tbody.appendChild(addKeywordRow(a)));
-      }
-
       loadArticles();
       document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('searchBtn').addEventListener('click', doSearch);
-      document.getElementById('keywordBtn').addEventListener('click', doKeywordSearch);
+      document.getElementById('filterInput').addEventListener('input', e => {
+        filters.keyword = e.target.value.trim();
+        renderArticles();
+      });
     </script>
   </body>
 </html>
