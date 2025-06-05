@@ -66,10 +66,8 @@
       </thead>
       <tbody id="articlesBody"></tbody>
     </table>
-    <script>
-      function escapeHtml(str) {
-        return str.replace(/[&<>]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[t]));
-      }
+    <script type="module">
+      import { createTombstone, escapeHtml } from './tombstone.js';
 
       function formatBody(text) {
         const limit = 200;
@@ -93,16 +91,7 @@
         });
       }
 
-      function formatTombstone(a) {
-        const acq = a.acquiror && a.acquiror !== 'N/A' ? escapeHtml(a.acquiror) : '';
-        const seller = a.seller && a.seller !== 'N/A' ? escapeHtml(a.seller) : '';
-        const target = a.target && a.target !== 'N/A' ? escapeHtml(a.target) : '';
-        const lines = [];
-        if (acq) lines.push(`<div class="font-bold text-lg">${acq}</div>`);
-        if (target) lines.push(`<div class="font-bold text-lg">${target}</div>`);
-        if (seller && seller !== target) lines.push(`<div class="font-bold text-lg">${seller}</div>`);
-        return lines.join('');
-      }
+
 
       const sectorIcons = {
         Healthcare: '⚕️',
@@ -154,7 +143,7 @@
           const tr = document.createElement('tr');
           const bodyHtml = a.body ? formatBody(a.body) : '';
           const hiddenClass = a.body ? '' : 'hidden';
-          const tombstone = formatTombstone(a);
+          const tombstone = createTombstone(a);
           const sectorHtml = formatSectorIndustry(a);
           const completedHtml = formatCompleted(a.completed);
           const truncated = a.title.length > 60 ? a.title.slice(0, 60) + '...' : a.title;
