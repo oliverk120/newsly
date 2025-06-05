@@ -99,6 +99,20 @@ async function initDb() {
     );
   }
 
+  const valRow = await configDb.get(
+    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    ['extractValueLocation']
+  );
+  if (valRow.count === 0) {
+    await configDb.run(
+      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      [
+        'extractValueLocation',
+        'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","location":"..."}. Text: "{text}"'
+      ]
+    );
+  }
+
   const aeInfo = await db.all('PRAGMA table_info(article_enrichments)');
   const hasBody = aeInfo.some(r => r.name === 'body');
   if (!hasBody) {
