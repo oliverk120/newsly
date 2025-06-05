@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const db = require('./db');
+const configDb = require('./configDb');
 const { runFilters } = require('./lib/filters');
 const { scrapeSource } = require('./lib/scraper');
 const { OpenAI } = require('openai');
@@ -11,7 +12,7 @@ const createPipeline = require('./lib/enrichment/pipeline');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const processArticle = createPipeline(db, openai);
+const processArticle = createPipeline(db, configDb, openai);
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -29,7 +30,7 @@ async function initDb() {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  await db.run(`CREATE TABLE IF NOT EXISTS filters (
+  await configDb.run(`CREATE TABLE IF NOT EXISTS filters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     type TEXT NOT NULL, -- 'keyword' or 'embedding'
@@ -43,8 +44,7 @@ async function initDb() {
     article_id INTEGER,
     filter_id INTEGER,
     matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(article_id) REFERENCES articles(id),
-    FOREIGN KEY(filter_id) REFERENCES filters(id)
+    FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
@@ -66,17 +66,17 @@ async function initDb() {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
-  await db.run(`CREATE TABLE IF NOT EXISTS prompts (
+  await configDb.run(`CREATE TABLE IF NOT EXISTS prompts (
     name TEXT PRIMARY KEY,
     template TEXT
   )`);
 
-  const promptRow = await db.get(
+  const promptRow = await configDb.get(
     'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
     ['extractParties']
   );
   if (promptRow.count === 0) {
-    await db.run(
+    await configDb.run(
       'INSERT INTO prompts (name, template) VALUES (?, ?)',
       [
         'extractParties',
@@ -115,7 +115,7 @@ async function initDb() {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
   }
 
-  await db.run(`CREATE TABLE IF NOT EXISTS sources (
+  await configDb.run(`CREATE TABLE IF NOT EXISTS sources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     base_url TEXT,
     article_selector TEXT,
@@ -129,28 +129,28 @@ async function initDb() {
     date_selector TEXT
   )`);
 
-  const srcInfo = await db.all('PRAGMA table_info(sources)');
+  const srcInfo = await configDb.all('PRAGMA table_info(sources)');
   const hasBodySel = srcInfo.some(r => r.name === 'body_selector');
   if (!hasBodySel) {
-    await db.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
+    await configDb.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
   }
   const hasLocationSel = srcInfo.some(r => r.name === 'location_selector');
   if (!hasLocationSel) {
-    await db.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
+    await configDb.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
   }
   const hasDateSel = srcInfo.some(r => r.name === 'date_selector');
   if (!hasDateSel) {
-    await db.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
+    await configDb.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
   }
 
-  const row = await db.get('SELECT COUNT(*) as count FROM sources');
+  const row = await configDb.get('SELECT COUNT(*) as count FROM sources');
   if (row.count === 0) {
     const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
          time_selector, link_selector, image_selector, body_selector,
          location_selector, date_selector)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    await db.run(insert, [
+    await configDb.run(insert, [
       'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
       'div.col-sm-12.card',
       'h3',
@@ -199,7 +199,7 @@ app.get('/stats', async (req, res) => {
 app.get('/scrape', async (req, res) => {
   const logs = [];
   try {
-    const sources = await db.all('SELECT * FROM sources');
+    const sources = await configDb.all('SELECT * FROM sources');
 
     logs.push(`Found ${sources.length} sources`);
 
@@ -231,7 +231,7 @@ app.get('/scrape', async (req, res) => {
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
 
-        await runFilters(db, insertedIds, logs);
+        await runFilters(db, configDb, insertedIds, logs);
 
       }
       details.push({
@@ -255,7 +255,7 @@ app.get('/scrape', async (req, res) => {
 app.get('/scrape-enrich', async (req, res) => {
   const logs = [];
   try {
-    const sources = await db.all('SELECT * FROM sources');
+    const sources = await configDb.all('SELECT * FROM sources');
     logs.push(`Found ${sources.length} sources`);
 
     let insertedTotal = 0;
@@ -287,7 +287,7 @@ app.get('/scrape-enrich', async (req, res) => {
       logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
 
       if (insertedIds.length) {
-        await runFilters(db, insertedIds, logs);
+        await runFilters(db, configDb, insertedIds, logs);
         const placeholders = insertedIds.map(() => '?').join(',');
         const rows = await db.all(
           `SELECT DISTINCT article_id FROM article_filter_matches WHERE article_id IN (${placeholders})`,
@@ -333,7 +333,7 @@ app.get('/run-filters', async (req, res) => {
     await db.run('DELETE FROM article_filter_matches');
     logs.push('Cleared previous filter matches');
 
-    await runFilters(db, ids, logs);
+    await runFilters(db, configDb, ids, logs);
     res.json({ processed: ids.length, logs });
   } catch (err) {
     console.error(err);

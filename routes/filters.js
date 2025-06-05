@@ -1,12 +1,12 @@
 const express = require('express');
-const db = require('../db');
+const configDb = require('../configDb');
 
 const router = express.Router();
 
 // Get all filters
 router.get('/', async (req, res) => {
   try {
-    const rows = await db.all('SELECT * FROM filters');
+    const rows = await configDb.all('SELECT * FROM filters');
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name, type, value, active = 1 } = req.body;
   try {
-    const result = await db.run(
+    const result = await configDb.run(
       'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
       [name, type, value, active]
     );
@@ -34,7 +34,7 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { name, type, value, active } = req.body;
   try {
-    const result = await db.run(
+    const result = await configDb.run(
       'UPDATE filters SET name = ?, type = ?, value = ?, active = ? WHERE id = ?',
       [name, type, value, active, id]
     );
@@ -49,7 +49,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await db.run('DELETE FROM filters WHERE id = ?', [id]);
+    const result = await configDb.run('DELETE FROM filters WHERE id = ?', [id]);
     res.json({ deleted: result.changes });
   } catch (err) {
     console.error(err);

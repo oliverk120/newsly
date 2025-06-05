@@ -1,6 +1,7 @@
 const express = require('express');
 const { OpenAI } = require('openai');
 const db = require('../db');
+const configDb = require('../configDb');
 const fetchAndStoreBody = require('../lib/enrichment/fetchAndStoreBody');
 const extractDateLocation = require('../lib/enrichment/extractDateLocation');
 const extractParties = require('../lib/enrichment/extractParties');
@@ -32,21 +33,22 @@ router.get('/', async (req, res) => {
       a.description,
       a.time,
       a.link,
-      GROUP_CONCAT(f.id) as filter_ids,
-      GROUP_CONCAT(f.name) as filter_names
+      GROUP_CONCAT(m.filter_id) as filter_ids
     FROM articles a
     LEFT JOIN article_filter_matches m ON a.id = m.article_id
-    LEFT JOIN filters f ON f.id = m.filter_id
     GROUP BY a.id
     ORDER BY a.created_at DESC`;
 
   try {
     const rows = await db.all(query);
+    const filterRows = await configDb.all('SELECT id, name FROM filters');
+    const filterMap = {};
+    filterRows.forEach(fr => { filterMap[fr.id] = fr.name; });
     rows.forEach(r => {
       r.filter_ids = r.filter_ids
         ? r.filter_ids.split(',').map(id => parseInt(id, 10))
         : [];
-      r.filter_names = r.filter_names ? r.filter_names.split(',') : [];
+      r.filter_names = r.filter_ids.map(id => filterMap[id]).filter(Boolean);
       r.matched = r.filter_ids.length > 0;
     });
     res.json(rows);
@@ -58,6 +60,10 @@ router.get('/', async (req, res) => {
 
 // Get the most recent M&A articles
 router.get('/mna-today', async (req, res) => {
+  const frows = await configDb.all("SELECT id FROM filters WHERE name = 'M&A'");
+  if (!frows.length) return res.json([]);
+  const ids = frows.map(r => r.id);
+  const placeholders = ids.map(() => '?').join(',');
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
@@ -65,14 +71,13 @@ router.get('/mna-today', async (req, res) => {
            ae.transaction_type, ae.log
     FROM articles a
     JOIN article_filter_matches m ON a.id = m.article_id
-    JOIN filters f ON f.id = m.filter_id
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
-    WHERE f.name = 'M&A'
+    WHERE m.filter_id IN (${placeholders})
     ORDER BY a.created_at DESC
     LIMIT 10`;
 
   try {
-    const rows = await db.all(query);
+    const rows = await db.all(query, ids);
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -158,8 +163,8 @@ router.get('/enriched-list', async (req, res) => {
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const bodyRes = await fetchAndStoreBody(db, openai, id);
-    const dateLocRes = await extractDateLocation(db, id);
+    const bodyRes = await fetchAndStoreBody(db, configDb, openai, id);
+    const dateLocRes = await extractDateLocation(db, configDb, id);
     res.json({ success: true, body: bodyRes.body, ...dateLocRes });
   } catch (err) {
     console.error(err);
@@ -171,7 +176,7 @@ router.post('/:id/enrich', async (req, res) => {
 router.post('/:id/extract-date-location', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await extractDateLocation(db, id);
+    const result = await extractDateLocation(db, configDb, id);
     res.json({ success: true, ...result });
   } catch (err) {
     console.error(err);
@@ -183,7 +188,7 @@ router.post('/:id/extract-date-location', async (req, res) => {
 router.post('/:id/extract-parties', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await extractParties(db, openai, id);
+    const result = await extractParties(db, configDb, openai, id);
     res.json({ success: true, ...result });
   } catch (err) {
     console.error(err);

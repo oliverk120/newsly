@@ -1,12 +1,12 @@
 const express = require('express');
-const db = require('../db');
+const configDb = require('../configDb');
 const { getPrompt, setPrompt } = require('../lib/prompts');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const rows = await db.all('SELECT name, template FROM prompts');
+    const rows = await configDb.all('SELECT name, template FROM prompts');
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 router.get('/:name', async (req, res) => {
   const { name } = req.params;
   try {
-    const template = await getPrompt(db, name);
+    const template = await getPrompt(configDb, name);
     if (!template) return res.status(404).json({ error: 'Prompt not found' });
     res.json({ name, template });
   } catch (err) {
@@ -30,7 +30,7 @@ router.put('/:name', async (req, res) => {
   const { name } = req.params;
   const { template } = req.body;
   try {
-    const changes = await setPrompt(db, name, template);
+    const changes = await setPrompt(configDb, name, template);
     res.json({ updated: changes });
   } catch (err) {
     console.error(err);
