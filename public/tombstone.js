@@ -6,13 +6,14 @@ export function createTombstone(article) {
   const acq = article.acquiror && article.acquiror !== 'N/A' ? escapeHtml(article.acquiror) : '';
   const seller = article.seller && article.seller !== 'N/A' ? escapeHtml(article.seller) : '';
   const target = article.target && article.target !== 'N/A' ? escapeHtml(article.target) : '';
-  const txType = article.transaction_type && article.transaction_type !== 'N/A'
-    ? escapeHtml(article.transaction_type)
+  const txTypeRaw = article.transaction_type && article.transaction_type !== 'N/A'
+    ? article.transaction_type.trim()
     : '';
+  const txType = txTypeRaw ? escapeHtml(txTypeRaw) : '';
   const location = article.location && article.location !== 'N/A' ? escapeHtml(article.location) : '';
 
   const bodyLines = [];
-  if (txType === 'M&A') {
+  if (txTypeRaw === 'M&A') {
     if (acq) bodyLines.push(`<div class="font-bold text-center">${acq}</div>`);
     if (target || acq) bodyLines.push('<div class="text-center">acquired</div>');
     if (target) bodyLines.push(`<div class="font-bold text-center">${target}</div>`);
@@ -20,7 +21,7 @@ export function createTombstone(article) {
       bodyLines.push('<div class="text-center">from</div>');
       bodyLines.push(`<div class="font-bold text-center">${seller}</div>`);
     }
-  } else if (txType === 'Financing') {
+  } else if (txTypeRaw === 'Financing') {
     if (seller) bodyLines.push(`<div class="font-bold text-center">${seller}</div>`);
     bodyLines.push('<div class="text-center">raised financing</div>');
     if (acq) {
