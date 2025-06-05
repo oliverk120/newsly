@@ -62,6 +62,7 @@ async function initDb() {
     body TEXT,
     transaction_type TEXT,
     completed TEXT,
+    log TEXT,
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
@@ -108,6 +109,10 @@ async function initDb() {
   const hasTx = aeInfo.some(r => r.name === 'transaction_type');
   if (!hasTx) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT');
+  }
+  const hasLog = aeInfo.some(r => r.name === 'log');
+  if (!hasLog) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
   }
 
   await db.run(`CREATE TABLE IF NOT EXISTS sources (
