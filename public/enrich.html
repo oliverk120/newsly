@@ -26,6 +26,7 @@
       <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
       <button id="getAllTextBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Get All Text</button>
       <button id="getAllPartiesBtn" class="bg-purple-500 text-white px-3 py-1 rounded">Extract Parties &amp; Type</button>
+      <button id="summarizeAllBtn" class="bg-orange-500 text-white px-3 py-1 rounded">Summarize All</button>
       <button id="fullEnrichBtn" class="bg-indigo-600 text-white px-3 py-1 rounded">Enrich All</button>
     </div>
 
@@ -44,6 +45,9 @@
           <th class="border px-2 py-1">Type</th>
           <th class="border px-2 py-1">Location</th>
           <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Summary</th>
+          <th class="border px-2 py-1">Sector</th>
+          <th class="border px-2 py-1">Industry</th>
           <th class="border px-2 py-1">Completed</th>
           <th class="border px-2 py-1">Text</th>
         </tr>
@@ -156,6 +160,42 @@
             } else if (data.error) {
               results.textContent = `Error: ${data.error}`;
             }
+          log.textContent = JSON.stringify(data, null, 2);
+        });
+      });
+
+        document.querySelectorAll('.summarizeBtn').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            const log = document.getElementById('actionLog');
+            const results = document.getElementById('actionResults');
+            log.textContent = '';
+            results.textContent = '';
+            console.log('Summarizing', id);
+
+            let data;
+            try {
+              const resp = await fetch(`/articles/${id}/summarize`, { method: 'POST' });
+              data = await resp.json();
+            } catch (err) {
+              console.error('Summarize request failed', err);
+              results.textContent = 'Request failed';
+              return;
+            }
+
+            console.log('Summarize response', data);
+            if (data.summary !== undefined) {
+              const row = e.target.closest('tr');
+              row.querySelector('.summary-cell').textContent = data.summary;
+              row.querySelector('.sector-cell').textContent = data.sector;
+              row.querySelector('.industry-cell').textContent = data.industry;
+              if (data.completed) {
+                row.querySelector('.completed-cell').textContent = data.completed;
+              }
+              results.textContent = `Summarized article ${id}`;
+            } else if (data.error) {
+              results.textContent = `Error: ${data.error}`;
+            }
             log.textContent = JSON.stringify(data, null, 2);
           });
         });
@@ -232,6 +272,36 @@
         results.textContent = `Updated parties/type for ${updated} articles`;
       }
 
+      async function summarizeAll() {
+        const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
+        const log = document.getElementById('actionLog');
+        const results = document.getElementById('actionResults');
+        log.textContent = '';
+        results.textContent = '';
+        let updated = 0;
+        for (const row of rows) {
+          const id = row.querySelector('.summarizeBtn').getAttribute('data-id');
+          let data;
+          try {
+            const resp = await fetch(`/articles/${id}/summarize`, { method: 'POST' });
+            data = await resp.json();
+          } catch (err) {
+            data = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(data, null, 2);
+          if (data.summary !== undefined) {
+            row.querySelector('.summary-cell').textContent = data.summary;
+            row.querySelector('.sector-cell').textContent = data.sector;
+            row.querySelector('.industry-cell').textContent = data.industry;
+            if (data.completed) {
+              row.querySelector('.completed-cell').textContent = data.completed;
+            }
+            updated++;
+          }
+        }
+        results.textContent = `Summarized ${updated} articles`;
+      }
+
       async function enrichAll() {
         const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
         const log = document.getElementById('actionLog');
@@ -286,6 +356,23 @@
             }
             success = true;
           }
+          let sData;
+          try {
+            const resp = await fetch(`/articles/${id}/summarize`, { method: 'POST' });
+            sData = await resp.json();
+          } catch (err) {
+            sData = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(sData, null, 2);
+          if (sData.summary !== undefined) {
+            row.querySelector('.summary-cell').textContent = sData.summary;
+            row.querySelector('.sector-cell').textContent = sData.sector;
+            row.querySelector('.industry-cell').textContent = sData.industry;
+            if (sData.completed) {
+              row.querySelector('.completed-cell').textContent = sData.completed;
+            }
+            success = true;
+          }
           if (success) updated++;
         }
         results.textContent = `Enriched ${updated} articles`;
@@ -322,6 +409,7 @@
             `<td class="border px-2 py-1 space-x-1">` +
               `<button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button>` +
               `<button data-id="${a.id}" class="extractBtn bg-purple-500 text-white px-2 py-1 rounded">Extract Parties &amp; Type</button>` +
+              `<button data-id="${a.id}" class="summarizeBtn bg-orange-500 text-white px-2 py-1 rounded">Summarize</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Deal Value</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Target Info</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Acquirer Info</button>` +
@@ -332,6 +420,9 @@
             `<td class="border px-2 py-1 type-cell">${a.transaction_type || ''}</td>` +
             `<td class="border px-2 py-1 location-cell">${a.location || ''}</td>` +
             `<td class="border px-2 py-1 date-cell">${a.article_date || ''}</td>` +
+            `<td class="border px-2 py-1 summary-cell">${a.summary || ''}</td>` +
+            `<td class="border px-2 py-1 sector-cell">${a.sector || ''}</td>` +
+            `<td class="border px-2 py-1 industry-cell">${a.industry || ''}</td>` +
             `<td class="border px-2 py-1 completed-cell">${a.completed || ''}</td>` +
             `<td class="border px-2 py-1"><div class="article-body ${hiddenClass}">${bodyHtml}</div></td>`;
           tbody.appendChild(tr);
@@ -344,6 +435,7 @@
       document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('getAllTextBtn').addEventListener('click', fetchAllBodies);
       document.getElementById('getAllPartiesBtn').addEventListener('click', extractAllParties);
+      document.getElementById('summarizeAllBtn').addEventListener('click', summarizeAll);
       document.getElementById('fullEnrichBtn').addEventListener('click', enrichAll);
     </script>
   </body>
