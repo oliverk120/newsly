@@ -26,6 +26,7 @@
       <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
       <button id="getAllTextBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Get All Text</button>
       <button id="getAllPartiesBtn" class="bg-purple-500 text-white px-3 py-1 rounded">Extract Parties &amp; Type</button>
+      <button id="fullEnrichBtn" class="bg-indigo-600 text-white px-3 py-1 rounded">Enrich All</button>
     </div>
 
     <div id="actionResults" class="mb-2 text-sm" style="min-height:1.25rem;"></div>
@@ -167,7 +168,7 @@
         const results = document.getElementById('actionResults');
         log.textContent = '';
         results.textContent = '';
-        const summary = [];
+        let updated = 0;
         for (const row of rows) {
           const id = row.querySelector('.enrichBtn').getAttribute('data-id');
           let data;
@@ -193,12 +194,10 @@
             if (data.location !== undefined) {
               row.querySelector('.location-cell').textContent = data.location;
             }
-            summary.push(`Article ${id}: ${data.body.length} chars`);
-          } else if (data.error) {
-            summary.push(`Article ${id}: ${data.error}`);
+            updated++;
           }
         }
-        results.textContent = summary.join('; ');
+        results.textContent = `Fetched text for ${updated} articles`;
       }
 
       async function extractAllParties() {
@@ -207,7 +206,7 @@
         const results = document.getElementById('actionResults');
         log.textContent = '';
         results.textContent = '';
-        const summary = [];
+        let updated = 0;
         for (const row of rows) {
           const id = row.querySelector('.extractBtn').getAttribute('data-id');
           let data;
@@ -226,12 +225,70 @@
             if (data.completed) {
               row.querySelector('.completed-cell').textContent = data.completed;
             }
-            summary.push(`Article ${id}: parties/type updated`);
+            updated++;
           } else if (data.error) {
-            summary.push(`Article ${id}: ${data.error}`);
           }
         }
-        results.textContent = summary.join('; ');
+        results.textContent = `Updated parties/type for ${updated} articles`;
+      }
+
+      async function enrichAll() {
+        const rows = Array.from(document.querySelectorAll('#articlesBody tr'));
+        const log = document.getElementById('actionLog');
+        const results = document.getElementById('actionResults');
+        log.textContent = '';
+        results.textContent = '';
+        let updated = 0;
+        for (const row of rows) {
+          const id = row.querySelector('.enrichBtn').getAttribute('data-id');
+          let data;
+          try {
+            const resp = await fetch(`/articles/${id}/enrich`, { method: 'POST' });
+            data = await resp.json();
+          } catch (err) {
+            data = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(data, null, 2);
+          let success = false;
+          if (data.body) {
+            const wrapper = row.querySelector('.article-body');
+            wrapper.innerHTML = formatBody(data.body);
+            wrapper.classList.remove('hidden');
+            row.querySelector('.enrichBtn').textContent = 'Refresh Text';
+            initToggles();
+            if (data.completed) {
+              row.querySelector('.completed-cell').textContent = data.completed;
+            }
+            if (data.date !== undefined) {
+              row.querySelector('.date-cell').textContent = data.date;
+            }
+            if (data.location !== undefined) {
+              row.querySelector('.location-cell').textContent = data.location;
+            }
+            success = true;
+          }
+
+          let pData;
+          try {
+            const resp = await fetch(`/articles/${id}/extract-parties`, { method: 'POST' });
+            pData = await resp.json();
+          } catch (err) {
+            pData = { error: 'Request failed' };
+          }
+          log.textContent = JSON.stringify(pData, null, 2);
+          if (pData.acquiror !== undefined && pData.target !== undefined) {
+            row.querySelector('.acquiror-cell').textContent = pData.acquiror;
+            row.querySelector('.seller-cell').textContent = pData.seller;
+            row.querySelector('.target-cell').textContent = pData.target;
+            row.querySelector('.type-cell').textContent = pData.transactionType;
+            if (pData.completed) {
+              row.querySelector('.completed-cell').textContent = pData.completed;
+            }
+            success = true;
+          }
+          if (success) updated++;
+        }
+        results.textContent = `Enriched ${updated} articles`;
       }
 
       async function loadArticles() {
@@ -287,6 +344,7 @@
       document.getElementById('loadBtn').addEventListener('click', loadArticles);
       document.getElementById('getAllTextBtn').addEventListener('click', fetchAllBodies);
       document.getElementById('getAllPartiesBtn').addEventListener('click', extractAllParties);
+      document.getElementById('fullEnrichBtn').addEventListener('click', enrichAll);
     </script>
   </body>
 </html>
