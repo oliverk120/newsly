@@ -6,6 +6,7 @@ Newsly is a small Express application that scrapes news sources and stores artic
 
 - Node.js 18 or newer (the repo uses Node.js 22 via the `.replit` config)
 - The server uses a local SQLite database at `raw_articles.db`
+- Scraping sources, filters and prompts are stored in `config.db`
 - To run enrichment routes you must set the `OPENAI_API_KEY` environment variable
 
 ## Setup

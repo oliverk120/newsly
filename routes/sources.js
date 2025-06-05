@@ -1,12 +1,12 @@
 const express = require('express');
-const db = require('../db');
+const configDb = require('../configDb');
 
 const router = express.Router();
 
 // Get all scraping sources
 router.get('/', async (req, res) => {
   try {
-    const rows = await db.all('SELECT * FROM sources');
+    const rows = await configDb.all('SELECT * FROM sources');
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -43,7 +43,7 @@ router.post('/', async (req, res) => {
   ];
 
   try {
-    const result = await db.run(
+    const result = await configDb.run(
       `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector, location_selector, date_selector)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params
@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await db.run('DELETE FROM sources WHERE id = ?', [id]);
+    const result = await configDb.run('DELETE FROM sources WHERE id = ?', [id]);
     res.json({ deleted: result.changes });
   } catch (err) {
     console.error(err);
@@ -98,7 +98,7 @@ router.put('/:id', async (req, res) => {
   ];
 
   try {
-    const result = await db.run(
+    const result = await configDb.run(
       `UPDATE sources SET base_url = ?, article_selector = ?, title_selector = ?, description_selector = ?, time_selector = ?, link_selector = ?, image_selector = ?, body_selector = ?, location_selector = ?, date_selector = ? WHERE id = ?`,
       params
     );
