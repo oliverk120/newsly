@@ -11,7 +11,9 @@
     <div id="summaryPills" class="mb-4 flex flex-wrap gap-2"></div>
     <div id="datePills" class="mb-4 flex flex-wrap gap-2">
       <span data-range="week" class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-blue-500 text-white">This Week</span>
-      <span data-range="month" class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-gray-200">This Month</span>
+
+      <span data-range="month" class="date-pill cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500">This Month</span>
+
       <span data-range="year" class="cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500">This Year</span>
     </div>
 
@@ -40,6 +42,9 @@
             if (pill.classList.contains('cursor-not-allowed')) return;
             filters.dateRange = pill.dataset.range;
             updateDatePills();
+
+            updateSummary();
+
             renderArticles();
           });
         });
@@ -147,7 +152,7 @@
         container.innerHTML = '';
 
         const sectorCounts = {};
-        allArticles.forEach(a => {
+        getRows('sector').forEach(a => {
           if (a.sector) sectorCounts[a.sector] = (sectorCounts[a.sector] || 0) + 1;
         });
 
@@ -177,7 +182,7 @@
             label.textContent = field === 'dealValue' ? 'Deal Value:' : 'Industry:';
           }
           container.appendChild(label);
-          values.slice(0, 10).forEach(v => {
+          values.forEach(v => {
             const pill = document.createElement('span');
             if (field === 'sector') {
               const icon = sectorIcons[v] || '🏢';
