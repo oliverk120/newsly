@@ -70,6 +70,7 @@
     </table>
     <script type="module">
       import { createTombstone, escapeHtml } from './tombstone.js';
+      import { sectorIcons } from './sectorIcons.js';
 
       function formatBody(text) {
         const limit = 200;
@@ -92,17 +93,6 @@
           };
         });
       }
-
-
-
-      const sectorIcons = {
-        Healthcare: '⚕️',
-        Energy: '⚡',
-        Industrials: '🏭',
-        Consumer: '🛒',
-        'Financial Services': '💰',
-        TMT: '💻'
-      };
 
       function formatSectorIndustry(a) {
         if (!a.sector && !a.industry) return '';
