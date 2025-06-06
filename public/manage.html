@@ -118,6 +118,7 @@
            `<td contenteditable="true" class="border px-2 py-1">${s.date_selector || ''}</td>` +
            `<td class="border px-2 py-1">` +
             `<button data-id="${s.id}" class="saveSource bg-blue-500 text-white px-2 py-1 rounded mr-2">Save</button>` +
+            `<button data-id="${s.id}" class="duplicateSource bg-purple-500 text-white px-2 py-1 rounded mr-2">Duplicate</button>` +
             `<button data-id="${s.id}" class="deleteSource bg-red-500 text-white px-2 py-1 rounded">Delete</button>` +
             `</td>`;
           tbody.appendChild(tr);
@@ -153,6 +154,14 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
+            loadSources();
+          });
+        });
+
+        document.querySelectorAll('.duplicateSource').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            await fetch(`/sources/${id}/duplicate`, { method: 'POST' });
             loadSources();
           });
         });
