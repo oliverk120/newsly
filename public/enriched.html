@@ -120,25 +120,46 @@
       }
 
       let allArticles = [];
-      const filters = { keyword: '', acquiror: '', seller: '', target: '', location: '', sector: '', industry: '' };
+      const filters = { keyword: '', sector: '', industry: '', dealValue: '' };
 
-      function renderArticles() {
-        const tbody = document.getElementById('articlesBody');
-        tbody.innerHTML = '';
+      function parseDealValueMillions(str) {
+        if (!str) return null;
+        const lower = str.toLowerCase();
+        if (lower.includes('undisclosed')) return null;
+        const m = str.replace(/[, ]/g, '').match(/(\d+(?:\.\d+)?)/);
+        if (!m) return null;
+        let num = parseFloat(m[1]);
+        if (/b|bn|billion/i.test(lower)) num *= 1000;
+        return num;
+      }
+
+      function valueBucket(str) {
+        const val = parseDealValueMillions(str);
+        if (val == null) return 'Undisclosed';
+        if (val < 20) return '0-20M';
+        if (val < 100) return '20-100M';
+        if (val < 1000) return '100M-1B';
+        return '1B+';
+      }
+
+      function getRows(ignore) {
         const kw = filters.keyword.toLowerCase();
-        const rows = allArticles.filter(a => {
-          if (filters.acquiror && a.acquiror !== filters.acquiror) return false;
-          if (filters.seller && a.seller !== filters.seller) return false;
-          if (filters.target && a.target !== filters.target) return false;
-          if (filters.location && a.location !== filters.location) return false;
-          if (filters.sector && a.sector !== filters.sector) return false;
-          if (filters.industry && a.industry !== filters.industry) return false;
+        return allArticles.filter(a => {
+          if (ignore !== 'sector' && filters.sector && a.sector !== filters.sector) return false;
+          if (ignore !== 'industry' && filters.industry && a.industry !== filters.industry) return false;
+          if (ignore !== 'dealValue' && filters.dealValue && a.valueBucket !== filters.dealValue) return false;
           if (kw) {
             const text = `${a.title} ${a.description || ''} ${a.body || ''}`.toLowerCase();
             if (!text.includes(kw)) return false;
           }
           return true;
         });
+      }
+
+      function renderArticles() {
+        const tbody = document.getElementById('articlesBody');
+        tbody.innerHTML = '';
+        const rows = getRows();
 
         rows.forEach((a, idx) => {
           const tr = document.createElement('tr');
@@ -167,17 +188,27 @@
       function updateSummary() {
         const container = document.getElementById('summaryPills');
         container.innerHTML = '';
+
         const sectorCounts = {};
         allArticles.forEach(a => {
           if (a.sector) sectorCounts[a.sector] = (sectorCounts[a.sector] || 0) + 1;
         });
+
+        const industryCounts = {};
+        getRows('industry').forEach(a => {
+          if (a.industry) industryCounts[a.industry] = (industryCounts[a.industry] || 0) + 1;
+        });
+
+        const valueCounts = {};
+        getRows('dealValue').forEach(a => {
+          const b = a.valueBucket;
+          valueCounts[b] = (valueCounts[b] || 0) + 1;
+        });
+
         const groups = {
           sector: Object.keys(sectorCounts),
-          acquiror: [...new Set(allArticles.map(a => a.acquiror).filter(Boolean))],
-          seller: [...new Set(allArticles.map(a => a.seller).filter(Boolean))],
-          target: [...new Set(allArticles.map(a => a.target).filter(Boolean))],
-          location: [...new Set(allArticles.map(a => a.location).filter(Boolean))],
-          industry: [...new Set(allArticles.map(a => a.industry).filter(Boolean))]
+          industry: Object.keys(industryCounts),
+          dealValue: ['0-20M','20-100M','100M-1B','1B+','Undisclosed'].filter(b => valueCounts[b])
         };
         Object.entries(groups).forEach(([field, values]) => {
           if (!values.length) return;
@@ -186,7 +217,7 @@
           if (field === 'sector') {
             label.textContent = 'Clairfield Sector:';
           } else {
-            label.textContent = field.charAt(0).toUpperCase() + field.slice(1) + ':';
+            label.textContent = field === 'dealValue' ? 'Deal Value:' : 'Industry:';
           }
           container.appendChild(label);
           values.slice(0, 10).forEach(v => {
@@ -195,23 +226,25 @@
               const icon = sectorIcons[v] || '🏢';
               const count = sectorCounts[v] || 0;
               pill.innerHTML = `${icon} ${v} (${count})`;
+            } else if (field === 'industry') {
+              const count = industryCounts[v] || 0;
+              pill.textContent = `${v} (${count})`;
             } else {
-              pill.textContent = v;
+              const count = valueCounts[v] || 0;
+              pill.textContent = `${v} (${count})`;
             }
             pill.dataset.field = field;
             pill.dataset.value = v;
-            pill.className = 'cursor-pointer bg-gray-200 rounded-full px-2 py-1 text-sm';
+            pill.className = 'cursor-pointer rounded-full px-2 py-1 text-sm';
+            if (filters[field] === v) {
+              pill.classList.add('bg-blue-500', 'text-white');
+            } else {
+              pill.classList.add('bg-gray-200');
+            }
             pill.addEventListener('click', () => {
               const cur = filters[field] === v;
               filters[field] = cur ? '' : v;
-              container.querySelectorAll(`span[data-field="${field}"]`).forEach(p => {
-                p.classList.remove('bg-blue-500', 'text-white');
-                p.classList.add('bg-gray-200');
-              });
-              if (!cur) {
-                pill.classList.remove('bg-gray-200');
-                pill.classList.add('bg-blue-500', 'text-white');
-              }
+              updateSummary();
               renderArticles();
             });
             container.appendChild(pill);
@@ -226,7 +259,7 @@
         const level = document.getElementById('levelSelect').value;
         const res = await fetch('/articles/enriched-list?level=' + level);
         const data = await res.json();
-        allArticles = data.articles;
+        allArticles = data.articles.map(a => ({ ...a, valueBucket: valueBucket(a.deal_value) }));
         document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
         updateSummary();
         renderArticles();
@@ -261,6 +294,7 @@
       document.getElementById('searchBtn').addEventListener('click', doSearch);
       document.getElementById('filterInput').addEventListener('input', e => {
         filters.keyword = e.target.value.trim();
+        updateSummary();
         renderArticles();
       });
     </script>
