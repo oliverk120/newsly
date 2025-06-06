@@ -221,8 +221,8 @@ app.get('/stats', async (req, res) => {
       } catch (e) {}
     });
 
-    const row = await db.get('SELECT COUNT(*) as total, MAX(created_at) as latest FROM articles');
-    res.json({ total: row.total, latest: row.latest, bySource });
+    const row = await db.get('SELECT COUNT(*) as total, MAX(created_at) as latest, MIN(created_at) as earliest FROM articles');
+    res.json({ total: row.total, latest: row.latest, earliest: row.earliest, bySource });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to retrieve stats' });
@@ -356,6 +356,82 @@ app.get('/scrape-enrich', async (req, res) => {
     console.error(err);
     logs.push(`Error: ${err.message}`);
     res.status(500).json({ error: 'Full scrape failed', logs });
+  }
+});
+
+// Streaming version of the full pipeline using Server-Sent Events
+app.get('/scrape-enrich-stream', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const logs = [];
+  const send = msg => res.write(`data: ${msg}\n\n`);
+
+  try {
+    const sources = await configDb.all('SELECT * FROM sources');
+    send(`Found ${sources.length} sources`);
+
+    let insertedTotal = 0;
+    let enrichedTotal = 0;
+
+    for (const source of sources) {
+      send(`Fetching ${source.base_url}`);
+      let articles;
+      try {
+        articles = await scrapeSource(source);
+        send(`Loaded ${articles.length} articles from ${source.base_url}`);
+      } catch (e) {
+        send(`Failed to fetch ${source.base_url}: ${e.message}`);
+        continue;
+      }
+
+      const insertPromises = articles.map(a =>
+        db.run(
+          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
+          [a.title, a.description, a.time, a.link, a.image]
+        )
+      );
+
+      const results = await Promise.all(insertPromises);
+      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
+      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
+      insertedTotal += inserted;
+      send(`Inserted ${inserted} new articles from ${source.base_url}`);
+
+      if (insertedIds.length) {
+        await runFilters(db, configDb, insertedIds, logs);
+        logs.forEach(send);
+        logs.length = 0;
+
+        const placeholders = insertedIds.map(() => '?').join(',');
+        const rows = await db.all(
+          `SELECT DISTINCT article_id FROM article_filter_matches WHERE article_id IN (${placeholders})`,
+          insertedIds
+        );
+        const matchedIds = rows.map(r => r.article_id);
+        for (const id of matchedIds) {
+          try {
+            await processArticle(id);
+            enrichedTotal++;
+            send(`Enriched article ${id}`);
+          } catch (e) {
+            send(`Failed to enrich article ${id}: ${e.message}`);
+          }
+        }
+      }
+    }
+
+    send(`Inserted total ${insertedTotal} new articles`);
+    send(`Enriched total ${enrichedTotal} articles`);
+    res.write(`event: done\ndata: ${JSON.stringify({ inserted: insertedTotal, enriched: enrichedTotal })}\n\n`);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    send(`Error: ${err.message}`);
+    res.write(`event: done\ndata: ${JSON.stringify({ error: 'Full scrape failed' })}\n\n`);
+    res.end();
   }
 });
 
