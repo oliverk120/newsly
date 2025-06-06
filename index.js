@@ -367,14 +367,18 @@ app.get('/scrape-enrich', async (req, res) => {
           insertedIds
         );
         const matchedIds = rows.map(r => r.article_id);
+        const enrichedIds = [];
         for (const id of matchedIds) {
           try {
             await processArticle(id);
             enrichedTotal++;
-            logs.push(`Enriched article ${id}`);
+            enrichedIds.push(id);
           } catch (e) {
             logs.push(`Failed to enrich article ${id}: ${e.message}`);
           }
+        }
+        if (enrichedIds.length) {
+          logs.push(`Enriched article ${enrichedIds.join(', ')}`);
         }
       }
 
