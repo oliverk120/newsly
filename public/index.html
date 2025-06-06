@@ -56,6 +56,7 @@
 
     <h2 class="text-xl font-semibold mb-2">Articles</h2>
     <div id="stats" class="mb-2"></div>
+    <div id="enrichStats" class="mb-2"></div>
     <table class="table-auto w-full border-collapse">
       <thead>
         <tr>
@@ -65,6 +66,12 @@
           <th class="border px-2 py-1">Time</th>
           <th class="border px-2 py-1">Link</th>
           <th class="border px-2 py-1">Match</th>
+          <th class="border px-2 py-1">Body</th>
+          <th class="border px-2 py-1">Embed</th>
+          <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Location</th>
+          <th class="border px-2 py-1">Parties</th>
+          <th class="border px-2 py-1">Summary</th>
         </tr>
       </thead>
       <tbody id="articlesBody"></tbody>
@@ -108,9 +115,12 @@
         'bg-orange-200 text-orange-800'
       ];
 
+      const enrichSteps = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
+
       async function loadArticles() {
-        const res = await fetch('/articles');
-        const articles = await res.json();
+        const res = await fetch('/articles/enriched-list?level=all');
+        const data = await res.json();
+        const articles = data.articles;
         const tbody = document.getElementById('articlesBody');
         tbody.innerHTML = '';
         articles.forEach((a, idx) => {
@@ -119,15 +129,24 @@
             const cls = colorClasses[a.filter_ids[i] % colorClasses.length];
             return `<span class="px-2 py-1 mr-1 rounded text-xs ${cls}">${name}</span>`;
           }).join('');
+          const done = a.completed ? a.completed.split(',') : [];
+          const stepCells = enrichSteps.map(s => {
+            const ok = done.includes(s);
+            const cls = ok ? '' : 'bg-red-200';
+            return `<td class="border px-2 py-1 text-center ${cls}">${ok ? '✓' : ''}</td>`;
+          }).join('');
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1">${a.title}</td>` +
             `<td class="border px-2 py-1">${a.description}</td>` +
             `<td class="border px-2 py-1">${a.time}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">Link</a></td>` +
-            `<td class="border px-2 py-1 text-center">${pills}</td>`;
+            `<td class="border px-2 py-1 text-center">${pills}</td>` +
+            stepCells;
           tbody.appendChild(tr);
         });
+        document.getElementById('enrichStats').textContent =
+          `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
       }
 
       async function loadStats() {
