@@ -77,7 +77,7 @@
       const enrichSteps = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
 
       async function loadArticles() {
-        const res = await fetch('/articles/enriched-list?level=all');
+        const res = await fetch('/articles/enriched-list?level=all&all=1');
         const data = await res.json();
         const articles = data.articles;
         const tbody = document.getElementById('articlesBody');
