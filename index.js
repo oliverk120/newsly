@@ -234,6 +234,7 @@ app.use('/articles', require('./routes/articles'));
 app.use('/sources', require('./routes/sources'));
 app.use('/filters', require('./routes/filters'));
 app.use('/prompts', require('./routes/prompts'));
+app.use('/pipeline', require('./routes/pipeline'));
 
 
 
