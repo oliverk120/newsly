@@ -250,8 +250,16 @@ app.get('/stats', async (req, res) => {
       } catch (e) {}
     });
 
-    const row = await db.get('SELECT COUNT(*) as total, MAX(created_at) as latest, MIN(created_at) as earliest FROM articles');
-    res.json({ total: row.total, latest: row.latest, earliest: row.earliest, bySource });
+    const row = await db.get(
+      'SELECT COUNT(*) as total, MAX(created_at) as latestScrape, MIN(created_at) as earliestScrape, MIN(time) as earliestArticle FROM articles'
+    );
+    res.json({
+      total: row.total,
+      latest: row.latestScrape,
+      earliestScrape: row.earliestScrape,
+      earliestArticle: row.earliestArticle,
+      bySource
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to retrieve stats' });

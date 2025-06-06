@@ -122,7 +122,7 @@
         for (const [src, count] of Object.entries(data.bySource)) {
           sourceParts += `${src}: ${count} articles `;
         }
-        div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | Earliest: ${data.earliest || 'N/A'} | ${sourceParts}`;
+        div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | Earliest Scrape: ${data.earliestScrape || 'N/A'} | Earliest Article: ${data.earliestArticle || 'N/A'} | ${sourceParts}`;
         if (last) last.textContent = `Last scrape: ${data.latest || 'N/A'}`;
       }
 
