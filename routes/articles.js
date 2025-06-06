@@ -5,6 +5,7 @@ const configDb = require('../configDb');
 const fetchAndStoreBody = require('../lib/enrichment/fetchAndStoreBody');
 const extractDateLocation = require('../lib/enrichment/extractDateLocation');
 const extractParties = require('../lib/enrichment/extractParties');
+const { getCompleted } = require('../lib/enrichment/steps');
 
 function cosineSimilarity(a, b) {
   let dot = 0;
@@ -67,7 +68,7 @@ router.get('/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date, ae.completed,
+           ae.location, ae.article_date,
            ae.transaction_type, ae.log
     FROM articles a
     JOIN article_filter_matches m ON a.id = m.article_id
@@ -78,6 +79,21 @@ router.get('/mna-today', async (req, res) => {
 
   try {
     const rows = await db.all(query, ids);
+    const articleIds = rows.map(r => r.id);
+    if (articleIds.length) {
+      const p = articleIds.map(() => '?').join(',');
+      const stepRows = await db.all(
+        `SELECT article_id, step_name FROM article_enrichment_steps WHERE article_id IN (${p})`,
+        articleIds
+      );
+      const map = {};
+      stepRows.forEach(s => {
+        (map[s.article_id] = map[s.article_id] || []).push(s.step_name);
+      });
+      rows.forEach(r => {
+        r.completed = (map[r.id] || []).join(',');
+      });
+    }
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -99,7 +115,7 @@ router.get('/enrich-list', async (req, res) => {
   const query = `
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date, ae.completed,
+           ae.location, ae.article_date,
            ae.transaction_type, ae.embedding, ae.log,
            ae.summary, ae.sector, ae.industry
     FROM articles a
@@ -110,13 +126,23 @@ router.get('/enrich-list', async (req, res) => {
 
   try {
     const rows = await db.all(query, [limit]);
+    const ids = rows.map(r => r.id);
     const required = ['body', 'embedding', 'date', 'location', 'parties'];
+    let stepMap = {};
+    if (ids.length) {
+      const p = ids.map(() => '?').join(',');
+      const stepRows = await db.all(
+        `SELECT article_id, step_name FROM article_enrichment_steps WHERE article_id IN (${p})`,
+        ids
+      );
+      stepRows.forEach(s => {
+        (stepMap[s.article_id] = stepMap[s.article_id] || []).push(s.step_name);
+      });
+    }
     const filtered = [];
     rows.forEach(r => {
-      const completed = r.completed ? r.completed.split(',') : [];
-      if (r.embedding) {
-        if (!completed.includes('embedding')) completed.push('embedding');
-      }
+      const completed = stepMap[r.id] || [];
+      if (r.embedding && !completed.includes('embedding')) completed.push('embedding');
       const isFull = required.every(k => completed.includes(k));
       r.completed = completed.join(',');
       if (excludeFull && isFull) return;
@@ -135,7 +161,7 @@ router.get('/enriched-list', async (req, res) => {
   const rows = await db.all(
     `SELECT a.id, a.title, a.description, a.time, a.link,
             ae.body, ae.acquiror, ae.seller, ae.target,
-            ae.deal_value, ae.location, ae.article_date, ae.completed,
+            ae.deal_value, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
        FROM articles a
@@ -144,12 +170,25 @@ router.get('/enriched-list', async (req, res) => {
       ORDER BY a.created_at DESC`
   );
 
+  const ids = rows.map(r => r.id);
+  let stepMap = {};
+  if (ids.length) {
+    const p = ids.map(() => '?').join(',');
+    const stepRows = await db.all(
+      `SELECT article_id, step_name FROM article_enrichment_steps WHERE article_id IN (${p})`,
+      ids
+    );
+    stepRows.forEach(s => {
+      (stepMap[s.article_id] = stepMap[s.article_id] || []).push(s.step_name);
+    });
+  }
+
   const required = ['body', 'embedding', 'date', 'location', 'parties'];
   let full = 0;
   let partial = 0;
   const articles = [];
   for (const r of rows) {
-    const completed = r.completed ? r.completed.split(',') : [];
+    const completed = stepMap[r.id] || [];
     const isFull = required.every(k => completed.includes(k));
     if (isFull) full++; else partial++;
     r.completed = completed.join(',');
