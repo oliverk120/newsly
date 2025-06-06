@@ -31,6 +31,7 @@
         <label class="mr-2"><input type="checkbox" name="incomplete" value="1"> Incomplete only</label>
         <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Run Pipeline</button>
       </form>
+      <button id="runMissingBtn" type="button" class="bg-green-500 text-white px-4 py-2 rounded">Run Missing Steps</button>
     </div>
     <p class="text-sm text-gray-600 mb-2">Scrapes new articles, runs filters and enriches the matches.</p>
 
@@ -176,6 +177,7 @@
       const scrapeBtn = document.getElementById('scrapeBtn');
       const runFiltersBtn = document.getElementById('runFiltersBtn');
       const pipelineForm = document.getElementById('pipelineForm');
+      const runMissingBtn = document.getElementById('runMissingBtn');
 
       scrapeBtn.addEventListener('click', async () => {
         const log = document.getElementById('scrapeLog');
@@ -204,6 +206,33 @@
         div.textContent = `Processed ${data.processed} articles`;
         log.textContent = (data.logs || []).join('\n');
         loadArticles();
+      });
+
+      runMissingBtn.addEventListener('click', async () => {
+        const log = document.getElementById('scrapeLog');
+        const div = document.getElementById('scrapeResults');
+        log.textContent = '';
+        div.textContent = 'Running pipeline...';
+
+        const formData = new FormData(pipelineForm);
+        const steps = formData.getAll('steps');
+        const since = formData.get('since');
+
+        const params = new URLSearchParams();
+        if (steps.length) params.set('steps', steps.join(','));
+        if (since) params.set('since', since);
+        params.set('incomplete', '1');
+
+        const res = await fetch(`/pipeline/run?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          div.textContent = 'Error running pipeline';
+        } else {
+          div.textContent = `Processed ${data.processed} articles`;
+        }
+        log.textContent = (data.logs || []).join('\n');
+        loadArticles();
+        loadStats();
       });
 
       pipelineForm.addEventListener('submit', async e => {
