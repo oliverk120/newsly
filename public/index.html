@@ -25,6 +25,7 @@
     <p class="text-sm text-gray-600 mb-2">Scrapes new articles, runs filters and enriches the matches.</p>
 
     <div id="scrapeResults" class="mb-2 text-sm"></div>
+    <div id="lastScrape" class="mb-2 text-sm"></div>
     <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
 
     <div class="flex items-center mb-2 space-x-2">
@@ -153,11 +154,13 @@
         const res = await fetch('/stats');
         const data = await res.json();
         const div = document.getElementById('stats');
+        const last = document.getElementById('lastScrape');
         let sourceParts = '';
         for (const [src, count] of Object.entries(data.bySource)) {
           sourceParts += `${src}: ${count} articles `;
         }
         div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | Earliest: ${data.earliest || 'N/A'} | ${sourceParts}`;
+        if (last) last.textContent = `Last scrape: ${data.latest || 'N/A'}`;
       }
 
       const scrapeBtn = document.getElementById('scrapeBtn');
