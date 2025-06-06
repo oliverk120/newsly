@@ -135,7 +135,7 @@
         for (const [src, count] of Object.entries(data.bySource)) {
           sourceParts += `${src}: ${count} articles `;
         }
-        div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | ${sourceParts}`;
+        div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | Earliest: ${data.earliest || 'N/A'} | ${sourceParts}`;
       }
 
       document.getElementById('scrapeBtn').addEventListener('click', async () => {
@@ -167,18 +167,33 @@
         loadArticles();
       });
 
-      document.getElementById('fullRunBtn').addEventListener('click', async () => {
+      document.getElementById('fullRunBtn').addEventListener('click', () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
         div.textContent = 'Running full pipeline...';
 
-        const res = await fetch('/scrape-enrich');
-        const data = await res.json();
-        div.textContent = `Inserted ${data.inserted} new, enriched ${data.enriched}`;
-        log.textContent = (data.logs || []).join('\n');
-        loadArticles();
-        loadStats();
+        const es = new EventSource('/scrape-enrich-stream');
+        es.onmessage = e => {
+          log.textContent += e.data + '\n';
+          log.scrollTop = log.scrollHeight;
+        };
+        es.addEventListener('done', e => {
+          es.close();
+          try {
+            const data = JSON.parse(e.data);
+            if (!data.error) {
+              div.textContent = `Inserted ${data.inserted} new, enriched ${data.enriched}`;
+            } else {
+              div.textContent = 'Error: ' + data.error;
+            }
+          } catch {
+            div.textContent = 'Completed';
+          }
+          loadArticles();
+          loadStats();
+        });
+        es.onerror = () => es.close();
       });
 
       loadSources();
