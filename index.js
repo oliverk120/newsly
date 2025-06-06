@@ -521,3 +521,16 @@ app.get('/run-filters', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Run the full scrape & enrich pipeline once every 24 hours
+const DAY_MS = 24 * 60 * 60 * 1000;
+async function runScheduledPipeline() {
+  try {
+    const res = await fetch(`http://localhost:${PORT}/scrape-enrich`);
+    const data = await res.json();
+    console.log('Scheduled pipeline result:', data);
+  } catch (err) {
+    console.error('Scheduled pipeline failed', err);
+  }
+}
+setInterval(runScheduledPipeline, DAY_MS);
