@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
     FROM articles a
     LEFT JOIN article_filter_matches m ON a.id = m.article_id
     GROUP BY a.id
-    ORDER BY a.created_at DESC`;
+    ORDER BY a.time DESC`;
 
   try {
     const rows = await db.all(query);
@@ -73,7 +73,7 @@ router.get('/mna-today', async (req, res) => {
     JOIN article_filter_matches m ON a.id = m.article_id
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
     WHERE m.filter_id IN (${placeholders})
-    ORDER BY a.created_at DESC
+    ORDER BY a.time DESC
     LIMIT 10`;
 
   try {
@@ -120,7 +120,7 @@ router.get('/enrich-list', async (req, res) => {
     FROM articles a
     ${join}
     LEFT JOIN article_enrichments ae ON a.id = ae.article_id
-    ORDER BY a.created_at DESC
+    ORDER BY a.time DESC
     LIMIT ?`;
 
   try {
@@ -159,14 +159,17 @@ router.get('/enriched-list', async (req, res) => {
   const level = req.query.level || 'all';
   const rows = await db.all(
     `SELECT a.id, a.title, a.description, a.time, a.link,
+            GROUP_CONCAT(m.filter_id) as filter_ids,
             ae.body, ae.acquiror, ae.seller, ae.target,
             ae.deal_value, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
        FROM articles a
+       LEFT JOIN article_filter_matches m ON a.id = m.article_id
        JOIN article_enrichments ae ON a.id = ae.article_id
       WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL
-      ORDER BY a.created_at DESC`
+      GROUP BY a.id
+      ORDER BY a.time DESC`
   );
 
   const ids = rows.map(r => r.id);
@@ -182,11 +185,20 @@ router.get('/enriched-list', async (req, res) => {
     });
   }
 
+  const filterRows = await configDb.all('SELECT id, name FROM filters');
+  const filterMap = {};
+  filterRows.forEach(fr => { filterMap[fr.id] = fr.name; });
+
   const required = ['body', 'embedding', 'date', 'location', 'parties'];
   let full = 0;
   let partial = 0;
   const articles = [];
   for (const r of rows) {
+    r.filter_ids = r.filter_ids
+      ? r.filter_ids.split(',').map(id => parseInt(id, 10))
+      : [];
+    r.filter_names = r.filter_ids.map(id => filterMap[id]).filter(Boolean);
+
     const completed = stepMap[r.id] || [];
     const isFull = required.every(k => completed.includes(k));
     if (isFull) full++; else partial++;
@@ -348,7 +360,7 @@ router.get('/keyword-search', async (req, res) => {
         WHERE a.title LIKE ? ESCAPE '\\'
            OR a.description LIKE ? ESCAPE '\\'
            OR ae.body LIKE ? ESCAPE '\\'
-        ORDER BY a.created_at DESC
+        ORDER BY a.time DESC
         LIMIT 50`,
       [pattern, pattern, pattern]
     );
