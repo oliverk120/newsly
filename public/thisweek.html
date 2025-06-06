@@ -8,49 +8,11 @@
   <body class="p-4">
     <h1 class="text-2xl font-bold mb-4">This Week in M&A</h1>
 
-    <div class="mb-4 space-x-2">
-      <input id="queryInput" class="border px-2 py-1" placeholder="Search text" />
-      <input id="thresholdInput" class="border px-2 py-1 w-24" type="number" step="0.01" min="0" max="1" value="0.8" />
-      <button id="searchBtn" class="bg-blue-500 text-white px-3 py-1 rounded">Search</button>
-    </div>
-
-    <div class="mb-4 space-x-2">
-      <input id="filterInput" class="border px-2 py-1" placeholder="Filter keywords" />
-    </div>
-
     <div id="summaryPills" class="mb-4 flex flex-wrap gap-2"></div>
-    <div class="mb-4 space-x-2">
-      <label>Date Range:
-        <select id="dateSelect" class="border px-2 py-1">
-          <option value="week" selected>This Week</option>
-          <option value="month">This Month</option>
-          <option value="year">This Year</option>
-        </select>
-      </label>
-    </div>
-
-    <table class="table-auto w-full border-collapse mb-4">
-      <thead>
-        <tr>
-          <th class="border px-2 py-1">Title</th>
-          <th class="border px-2 py-1">Description</th>
-          <th class="border px-2 py-1">Score</th>
-          <th class="border px-2 py-1">Link</th>
-        </tr>
-      </thead>
-      <tbody id="resultsBody"></tbody>
-    </table>
-
-
-    <div class="mb-4 space-x-2">
-      <label>Completeness:
-        <select id="levelSelect" class="border px-2 py-1">
-          <option value="all">All</option>
-          <option value="full">Fully Complete</option>
-          <option value="partial">Incomplete</option>
-        </select>
-      </label>
-      <button id="loadBtn" class="bg-green-500 text-white px-3 py-1 rounded">Load Articles</button>
+    <div id="datePills" class="mb-4 flex flex-wrap gap-2">
+      <span data-range="week" class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-blue-500 text-white">This Week</span>
+      <span data-range="month" class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-gray-200">This Month</span>
+      <span data-range="year" class="cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500">This Year</span>
     </div>
 
     <div id="stats" class="mb-2 text-sm"></div>
@@ -72,45 +34,31 @@
       import { createTombstone, escapeHtml } from './tombstone.js';
       import { sectorIcons } from './sectorIcons.js';
 
-      function formatBody(text) {
-        const limit = 200;
-        text = text.replace(/\n+/g, '\n');
-        if (text.length <= limit) {
-          return `<div class="text-container"><span class="full">${escapeHtml(text)}</span></div>`;
-        }
-        const preview = escapeHtml(text.slice(0, limit)) + '...';
-        return `<div class="text-container"><span class="preview">${preview}</span><span class="full hidden">${escapeHtml(text)}</span> <a href="#" class="seeMore text-blue-600 underline">See more</a></div>`;
-      }
-
-      function initToggles() {
-        document.querySelectorAll('.seeMore').forEach(link => {
-          link.onclick = e => {
-            e.preventDefault();
-            const container = e.target.closest('.text-container');
-            container.querySelector('.preview').classList.toggle('hidden');
-            container.querySelector('.full').classList.toggle('hidden');
-            e.target.textContent = container.querySelector('.full').classList.contains('hidden') ? 'See more' : 'Hide';
-          };
+      function initDatePills() {
+        document.querySelectorAll('.date-pill').forEach(pill => {
+          pill.addEventListener('click', () => {
+            if (pill.classList.contains('cursor-not-allowed')) return;
+            filters.dateRange = pill.dataset.range;
+            updateDatePills();
+            renderArticles();
+          });
         });
       }
 
-      function formatSectorIndustry(a) {
-        if (!a.sector && !a.industry) return '';
-        const icon = sectorIcons[a.sector] || '🏢';
-        const sector = a.sector ? escapeHtml(a.sector) : '';
-        const industry = a.industry ? escapeHtml(a.industry) : '';
-        return `${icon} ${sector}<br>${industry}`;
-      }
-
-        const types = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
-        const done = str ? str.split(',') : [];
-        return types
-          .map(t => `<div>${t}: ${done.includes(t) ? '✓' : ''}</div>`)
-          .join('');
+      function updateDatePills() {
+        document.querySelectorAll('.date-pill').forEach(pill => {
+          if (pill.dataset.range === filters.dateRange) {
+            pill.classList.remove('bg-gray-200');
+            pill.classList.add('bg-blue-500','text-white');
+          } else if (!pill.classList.contains('cursor-not-allowed')) {
+            pill.classList.remove('bg-blue-500','text-white');
+            pill.classList.add('bg-gray-200');
+          }
+        });
       }
 
       let allArticles = [];
-      const filters = { keyword: '', sector: '', industry: '', dealValue: '', dateRange: 'week' };
+      const filters = { sector: '', industry: '', dealValue: '', dateRange: 'week' };
 
       function parseDealValueMillions(str) {
         if (!str) return null;
@@ -132,8 +80,15 @@
         return '1B+';
       }
 
+      function formatSectorIndustry(a) {
+        if (!a.sector && !a.industry) return '';
+        const icon = sectorIcons[a.sector] || '🏢';
+        const sector = a.sector ? escapeHtml(a.sector) : '';
+        const industry = a.industry ? escapeHtml(a.industry) : '';
+        return `${icon} ${sector}<br>${industry}`;
+      }
+
       function getRows(ignore) {
-        const kw = filters.keyword.toLowerCase();
         return allArticles.filter(a => {
           if (ignore !== 'sector' && filters.sector && a.sector !== filters.sector) return false;
           if (ignore !== 'industry' && filters.industry && a.industry !== filters.industry) return false;
@@ -161,10 +116,6 @@
               if (start && end && (d < start || d >= end)) return false;
             }
           }
-          if (kw) {
-            const text = `${a.title} ${a.description || ''} ${a.body || ''}`.toLowerCase();
-            if (!text.includes(kw)) return false;
-          }
           return true;
         });
       }
@@ -173,7 +124,6 @@
         const tbody = document.getElementById('articlesBody');
         tbody.innerHTML = '';
         const rows = getRows();
-
         rows.forEach((a, idx) => {
           const tr = document.createElement('tr');
           const tombstone = createTombstone(a);
@@ -187,23 +137,13 @@
             `<td class="border px-2 py-1 w-1/3">${summary}</td>` +
             `<td class="border px-2 py-1">${sectorHtml}</td>` +
             `<td class="border px-2 py-1">${a.location || ''}</td>` +
-            `<td class="border px-2 py-1">${a.deal_value || ''}</td>` +
+            `<td class="border px-2 py-1">${a.deal_value || ''}</td>`;
           tbody.appendChild(tr);
         });
-        initToggles();
       }
 
       function updateSummary() {
         const container = document.getElementById('summaryPills');
-    <div class="mb-4 space-x-2">
-      <label>Date Range:
-        <select id="dateSelect" class="border px-2 py-1">
-          <option value="week" selected>This Week</option>
-          <option value="month">This Month</option>
-          <option value="year">This Year</option>
-        </select>
-      </label>
-    </div>
         container.innerHTML = '';
 
         const sectorCounts = {};
@@ -273,8 +213,7 @@
       }
 
       async function loadArticles() {
-        const level = document.getElementById('levelSelect').value;
-        const res = await fetch('/articles/enriched-list?level=' + level);
+        const res = await fetch('/articles/enriched-list?level=full');
         const data = await res.json();
         allArticles = data.articles.map(a => ({ ...a, valueBucket: valueBucket(a.deal_value) }));
         document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
@@ -282,42 +221,8 @@
         renderArticles();
       }
 
-      function addRow(a, matched) {
-        const tr = document.createElement('tr');
-        if (matched) tr.classList.add('bg-green-200');
-        tr.innerHTML =
-          `<td class="border px-2 py-1">${a.title}</td>` +
-          `<td class="border px-2 py-1">${a.description || ''}</td>` +
-          `<td class="border px-2 py-1">${a.score.toFixed(3)}</td>` +
-          `<td class="border px-2 py-1"><a href="${a.link}" target="_blank" class="text-blue-600 underline">Link</a></td>`;
-        return tr;
-      }
-
-      async function doSearch() {
-        const q = document.getElementById('queryInput').value.trim();
-        const threshold = parseFloat(document.getElementById('thresholdInput').value) || 0.8;
-        if (!q) return;
-        const params = new URLSearchParams({ q, threshold });
-        const res = await fetch('/articles/semantic-search?' + params.toString());
-        const data = await res.json();
-        const tbody = document.getElementById('resultsBody');
-        tbody.innerHTML = '';
-        (data.matches || []).forEach(a => tbody.appendChild(addRow(a, true)));
-        (data.others || []).forEach(a => tbody.appendChild(addRow(a, false)));
-      }
-
       loadArticles();
-      document.getElementById('loadBtn').addEventListener('click', loadArticles);
-      document.getElementById('searchBtn').addEventListener('click', doSearch);
-      document.getElementById('filterInput').addEventListener('input', e => {
-        filters.keyword = e.target.value.trim();
-        updateSummary();
-        renderArticles();
-      });
-      document.getElementById("dateSelect").addEventListener("change", e => {
-        filters.dateRange = e.target.value;
-        renderArticles();
-      });
+      initDatePills();
     </script>
   </body>
 </html>
