@@ -67,6 +67,36 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Duplicate a scraping source
+router.post('/:id/duplicate', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const source = await configDb.get('SELECT * FROM sources WHERE id = ?', [id]);
+    if (!source) return res.status(404).json({ error: 'Source not found' });
+    const params = [
+      source.base_url,
+      source.article_selector,
+      source.title_selector,
+      source.description_selector,
+      source.time_selector,
+      source.link_selector,
+      source.image_selector,
+      source.body_selector,
+      source.location_selector,
+      source.date_selector,
+    ];
+    const result = await configDb.run(
+      `INSERT INTO sources (base_url, article_selector, title_selector, description_selector, time_selector, link_selector, image_selector, body_selector, location_selector, date_selector)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      params
+    );
+    res.json({ id: result.lastID });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to duplicate source' });
+  }
+});
+
 // Update a scraping source
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
