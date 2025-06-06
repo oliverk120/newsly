@@ -14,6 +14,8 @@ const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const processArticle = createPipeline(db, configDb, openai);
 
+let stopPipeline = false;
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -361,6 +363,7 @@ app.get('/scrape-enrich', async (req, res) => {
 
 // Streaming version of the full pipeline using Server-Sent Events
 app.get('/scrape-enrich-stream', async (req, res) => {
+  stopPipeline = false;
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -380,6 +383,11 @@ app.get('/scrape-enrich-stream', async (req, res) => {
 
 
     for (const source of sources) {
+      if (stopPipeline) {
+        send('Pipeline stopped');
+        res.write(`event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`);
+        return res.end();
+      }
       send(`Fetching ${source.base_url}`);
       let articles;
       try {
@@ -424,6 +432,11 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     send(`Enriching ${totalToEnrich} articles`);
     let count = 0;
     for (const id of toEnrich) {
+      if (stopPipeline) {
+        send('Pipeline stopped');
+        res.write(`event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`);
+        return res.end();
+      }
       try {
         await processArticle(id);
         count++;
@@ -443,6 +456,11 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     res.write(`event: done\ndata: ${JSON.stringify({ error: 'Full scrape failed' })}\n\n`);
     res.end();
   }
+});
+
+app.post('/stop-pipeline', (req, res) => {
+  stopPipeline = true;
+  res.json({ stopped: true });
 });
 
 // Re-run filters for all existing articles

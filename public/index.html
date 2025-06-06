@@ -14,17 +14,21 @@
     </nav>
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
 
-    <div class="mb-4">
+    <div class="mb-4 flex items-center space-x-2">
+      <div class="inline-flex rounded-md shadow-sm" role="group">
+        <button id="scrapeBtn" class="px-4 py-2 bg-blue-300 hover:bg-blue-400 text-black">Scrape Articles</button>
+        <button id="runFiltersBtn" class="px-4 py-2 bg-blue-400 hover:bg-blue-500 text-black">Run Filters</button>
+      </div>
       <button id="fullRunBtn" class="bg-green-600 text-white px-4 py-2 rounded">Run Full Pipeline</button>
-      <p class="text-sm text-gray-600 mt-1">Scrapes new articles, runs filters and enriches the matches.</p>
+      <button id="stopBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">Stop</button>
     </div>
+    <p class="text-sm text-gray-600 mb-2">Scrapes new articles, runs filters and enriches the matches.</p>
 
     <div id="scrapeResults" class="mb-2 text-sm"></div>
     <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
 
     <div class="flex items-center mb-2 space-x-2">
       <h2 class="text-xl font-semibold">Sources</h2>
-      <button id="scrapeBtn" class="bg-blue-500 text-white px-4 py-2 rounded">Scrape Articles</button>
     </div>
     <table class="table-auto w-full mb-6 border-collapse" id="sourcesTable">
       <thead>
@@ -37,7 +41,6 @@
 
     <div class="flex items-center mb-2 space-x-2">
       <h2 class="text-xl font-semibold">Active Filters</h2>
-      <button id="runFiltersBtn" class="bg-purple-500 text-white px-4 py-2 rounded">Run Filters</button>
     </div>
     <p class="text-sm text-gray-600 mb-2">Use <code>*</code> for any number of characters and <code>?</code> for a single character in keyword filters.</p>
     <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
@@ -138,7 +141,22 @@
         div.textContent = `Total: ${data.total} | Latest: ${data.latest || 'N/A'} | Earliest: ${data.earliest || 'N/A'} | ${sourceParts}`;
       }
 
-      document.getElementById('scrapeBtn').addEventListener('click', async () => {
+      const scrapeBtn = document.getElementById('scrapeBtn');
+      const runFiltersBtn = document.getElementById('runFiltersBtn');
+      const fullRunBtn = document.getElementById('fullRunBtn');
+      const stopBtn = document.getElementById('stopBtn');
+
+      let es;
+      let totalEnrich = 0;
+      let progress = 0;
+
+      const updateBar = () => {
+        if (!totalEnrich) return;
+        const bar = Array.from({ length: totalEnrich }, (_, i) => i < progress ? '█' : '_').join('');
+        document.getElementById('scrapeLog').textContent = 'Enriching ' + bar;
+      };
+
+      scrapeBtn.addEventListener('click', async () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
@@ -154,7 +172,7 @@
         loadStats();
       });
 
-      document.getElementById('runFiltersBtn').addEventListener('click', async () => {
+      runFiltersBtn.addEventListener('click', async () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
@@ -167,19 +185,37 @@
         loadArticles();
       });
 
-      document.getElementById('fullRunBtn').addEventListener('click', () => {
+      fullRunBtn.addEventListener('click', () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
         div.textContent = 'Running full pipeline...';
-
-        const es = new EventSource('/scrape-enrich-stream');
+        totalEnrich = 0;
+        progress = 0;
+        es = new EventSource('/scrape-enrich-stream');
+        stopBtn.classList.remove('hidden');
         es.onmessage = e => {
+          if (e.data.startsWith('Enriching ') && e.data.endsWith(' articles')) {
+            const m = e.data.match(/Enriching (\d+) articles/);
+            if (m) {
+              totalEnrich = parseInt(m[1], 10);
+              progress = 0;
+              updateBar();
+              return;
+            }
+          }
+          const m = e.data.match(/^Enriched (\d+)/(\d+)/);
+          if (m) {
+            progress = parseInt(m[1], 10);
+            updateBar();
+            return;
+          }
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
         es.addEventListener('done', e => {
           es.close();
+          stopBtn.classList.add('hidden');
           try {
             const data = JSON.parse(e.data);
             if (!data.error) {
@@ -193,7 +229,16 @@
           loadArticles();
           loadStats();
         });
-        es.onerror = () => es.close();
+        es.onerror = () => {
+          es.close();
+          stopBtn.classList.add('hidden');
+        };
+      });
+
+      stopBtn.addEventListener('click', async () => {
+        if (es) es.close();
+        stopBtn.classList.add('hidden');
+        await fetch('/stop-pipeline', { method: 'POST' });
       });
 
       loadSources();
