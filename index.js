@@ -68,6 +68,32 @@ async function initDb() {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
+  await db.run(`CREATE TABLE IF NOT EXISTS article_enrichment_steps (
+    article_id INTEGER,
+    step_name TEXT,
+    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(article_id, step_name),
+    FOREIGN KEY(article_id) REFERENCES articles(id)
+  )`);
+
+  const stepCountRow = await db.get('SELECT COUNT(*) as count FROM article_enrichment_steps');
+  if (stepCountRow.count === 0) {
+    const rows = await db.all('SELECT article_id, completed, embedding FROM article_enrichments');
+    for (const r of rows) {
+      let steps = [];
+      if (r.completed) {
+        steps = r.completed.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      if (r.embedding && !steps.includes('embedding')) steps.push('embedding');
+      for (const s of steps) {
+        await db.run(
+          'INSERT OR IGNORE INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?)',
+          [r.article_id, s]
+        );
+      }
+    }
+  }
+
   await configDb.run(`CREATE TABLE IF NOT EXISTS prompts (
     name TEXT PRIMARY KEY,
     template TEXT

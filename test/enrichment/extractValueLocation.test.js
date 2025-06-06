@@ -3,23 +3,34 @@ const assert = require('node:assert/strict');
 const extractValueAndLocation = require('../../lib/enrichment/extractValueAndLocation');
 
 function createArticleDb(initialLocation = 'Paris') {
-  const store = { location: initialLocation, completed: '' };
+  const store = { location: initialLocation, steps: [] };
   return {
-    get: async (sql) => {
+    get: async (sql, params) => {
       if (sql.includes('body, location')) {
         return { body: 'body text', location: store.location };
       }
-      if (sql.includes('SELECT completed')) {
-        return { completed: store.completed };
+      if (sql.startsWith('SELECT 1 FROM article_enrichment_steps')) {
+        const step = params[1];
+        return store.steps.includes(step) ? { 1: 1 } : undefined;
+      }
+      if (sql.startsWith('SELECT step_name FROM article_enrichment_steps')) {
+        return store.steps.map(s => ({ step_name: s }));
       }
       return null;
+    },
+    all: async (sql) => {
+      if (sql.startsWith('SELECT step_name FROM article_enrichment_steps')) {
+        return store.steps.map(s => ({ step_name: s }));
+      }
+      return [];
     },
     run: async (sql, params) => {
       if (sql.startsWith('INSERT INTO article_enrichments')) {
         store.dealValue = params[1];
         store.location = params[2];
-      } else if (sql.startsWith('UPDATE article_enrichments SET completed')) {
-        store.completed = params[0];
+      } else if (sql.startsWith('INSERT INTO article_enrichment_steps')) {
+        const step = params[1];
+        if (!store.steps.includes(step)) store.steps.push(step);
       }
       return { changes: 1 };
     }
