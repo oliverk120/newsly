@@ -64,12 +64,12 @@
     </style>
   </head>
   <body class="p-4">
-    <header class="mb-4 flex items-center justify-between">
+    <header class="mb-4 flex items-center justify-between bg-white">
       <h1 class="text-2xl font-bold">This Week in M&A</h1>
       <img
         src="https://newpoint.ca/wp-content/uploads/2024/12/newpoint-logo.png"
         alt="Newpoint logo"
-        class="h-10"
+        style="height:60px"
       />
     </header>
 
@@ -129,6 +129,10 @@
 
       let allArticles = [];
       const filters = { sector: '', industry: '', dealValue: '', dateRange: 'week' };
+      let industryShowMore = false;
+      let articleTotal = 0;
+      let sources = [];
+      let sourcesShowMore = false;
 
       function parseDealValueMillions(str) {
         if (!str) return null;
@@ -234,11 +238,15 @@
 
         const groups = {
           sector: Object.keys(sectorCounts),
-          industry: Object.keys(industryCounts),
+          industry: Object.keys(industryCounts).sort((a,b) => industryCounts[b] - industryCounts[a]),
           dealValue: ['0-20M','20-100M','100M-1B','1B+','Undisclosed'].filter(b => valueCounts[b])
         };
         Object.entries(groups).forEach(([field, values]) => {
           if (!values.length) return;
+          const originalValues = values;
+          if (field === 'industry' && !industryShowMore) {
+            values = values.slice(0, 10);
+          }
           const label = document.createElement('span');
           label.className = 'font-semibold mr-2';
           if (field === 'sector') {
@@ -276,22 +284,63 @@
             });
             container.appendChild(pill);
           });
+          if (field === 'industry' && originalValues.length > 10) {
+            const btn = document.createElement('button');
+            btn.textContent = industryShowMore ? 'Show Less' : 'Show More';
+            btn.className = 'ml-2 text-blue-600 underline';
+            btn.addEventListener('click', () => {
+              industryShowMore = !industryShowMore;
+              updateSummary();
+            });
+            container.appendChild(btn);
+          }
           const spacer = document.createElement('span');
           spacer.className = 'w-full';
           container.appendChild(spacer);
         });
       }
 
+      function updateStats() {
+        const el = document.getElementById('stats');
+        const roots = sources.map(s => {
+          try {
+            return new URL(s.base_url).origin;
+          } catch {
+            return s.base_url;
+          }
+        });
+        const list = sourcesShowMore ? roots : roots.slice(0, 10);
+        el.innerHTML = `Total: ${articleTotal} | Sources: ${list.join(', ')}`;
+        if (roots.length > 10) {
+          const btn = document.createElement('button');
+          btn.textContent = sourcesShowMore ? 'Show Less' : 'Show More';
+          btn.className = 'ml-2 text-blue-600 underline';
+          btn.addEventListener('click', () => {
+            sourcesShowMore = !sourcesShowMore;
+            updateStats();
+          });
+          el.appendChild(btn);
+        }
+      }
+
       async function loadArticles() {
         const res = await fetch('/articles/enriched-list?level=full');
         const data = await res.json();
         allArticles = data.articles.map(a => ({ ...a, valueBucket: valueBucket(a.deal_value) }));
-        document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
+        articleTotal = data.stats.total;
         updateSummary();
         renderArticles();
+        updateStats();
+      }
+
+      async function loadSources() {
+        const res = await fetch('/sources');
+        sources = await res.json();
+        updateStats();
       }
 
       loadArticles();
+      loadSources();
       initDatePills();
     </script>
   </body>
