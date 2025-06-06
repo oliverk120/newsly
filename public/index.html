@@ -39,34 +39,13 @@
     <div id="lastScrape" class="mb-2 text-sm"></div>
     <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
 
-    <div class="flex items-center mb-2 space-x-2">
-      <h2 class="text-xl font-semibold">Sources</h2>
-    </div>
-    <table class="table-auto w-full mb-6 border-collapse" id="sourcesTable">
-      <thead>
-        <tr>
-          <th class="border px-2 py-1">Base URL</th>
-        </tr>
-      </thead>
-      <tbody id="sourcesBody"></tbody>
-    </table>
-
-    <div class="flex items-center mb-2 space-x-2">
-      <h2 class="text-xl font-semibold">Active Filters</h2>
-    </div>
-    <p class="text-sm text-gray-600 mb-2">Use <code>*</code> for any number of characters and <code>?</code> for a single character in keyword filters.</p>
-    <table class="table-auto w-full mb-6 border-collapse" id="filtersTable">
-      <thead>
-        <tr>
-          <th class="border px-2 py-1">Name</th>
-          <th class="border px-2 py-1">Type</th>
-          <th class="border px-2 py-1">Value</th>
-        </tr>
-      </thead>
-      <tbody id="filtersBody"></tbody>
-    </table>
+    <p class="mb-4 text-sm">
+      Manage sources and filters on the
+      <a href="/manage.html" class="text-blue-600 underline">configuration page</a>.
+    </p>
 
     <h2 class="text-xl font-semibold mb-2">Articles</h2>
+
     <div id="stats" class="mb-2"></div>
     <div id="enrichStats" class="mb-2"></div>
     <table class="table-auto w-full border-collapse">
@@ -89,33 +68,6 @@
       <tbody id="articlesBody"></tbody>
     </table>
     <script>
-      async function loadSources() {
-        const res = await fetch('/sources');
-        const sources = await res.json();
-        const tbody = document.getElementById('sourcesBody');
-        tbody.innerHTML = '';
-        sources.forEach(s => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td class="border px-2 py-1">${s.base_url}</td>`;
-          tbody.appendChild(tr);
-        });
-      }
-
-      async function loadFilters() {
-        const res = await fetch('/filters');
-        const filters = (await res.json()).filter(f => f.active);
-        const tbody = document.getElementById('filtersBody');
-        tbody.innerHTML = '';
-        filters.forEach(f => {
-          const tr = document.createElement('tr');
-          const cls = colorClasses[f.id % colorClasses.length];
-          tr.innerHTML =
-            `<td class="border px-2 py-1 ${cls}">${f.name || ''}</td>` +
-            `<td class="border px-2 py-1 ${cls}">${f.type}</td>` +
-            `<td class="border px-2 py-1 ${cls}">${f.value || ''}</td>`;
-          tbody.appendChild(tr);
-        });
-      }
 
       const colorClasses = [
         'bg-red-200 text-red-800',
@@ -264,10 +216,8 @@
         loadStats();
       });
 
-      loadSources();
       loadArticles();
       loadStats();
-      loadFilters();
     </script>
   </body>
 </html>
