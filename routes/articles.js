@@ -2,10 +2,8 @@ const express = require('express');
 const { OpenAI } = require('openai');
 const db = require('../db');
 const configDb = require('../configDb');
-const fetchAndStoreBody = require('../lib/enrichment/fetchAndStoreBody');
-const extractDateLocation = require('../lib/enrichment/extractDateLocation');
-const extractParties = require('../lib/enrichment/extractParties');
 const { getCompleted } = require('../lib/enrichment/steps');
+const createPipeline = require('../lib/enrichment/pipeline');
 
 function cosineSimilarity(a, b) {
   let dot = 0;
@@ -24,6 +22,7 @@ function cosineSimilarity(a, b) {
 
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const processArticle = createPipeline(db, configDb, openai);
 
 // Get all articles
 router.get('/', async (req, res) => {
@@ -204,9 +203,12 @@ router.get('/enriched-list', async (req, res) => {
 router.post('/:id/enrich', async (req, res) => {
   const { id } = req.params;
   try {
-    const bodyRes = await fetchAndStoreBody(db, configDb, openai, id);
-    const dateLocRes = await extractDateLocation(db, configDb, id);
-    res.json({ success: true, body: bodyRes.body, ...dateLocRes });
+    await processArticle(id, ['body', 'date']);
+    const row = await db.get(
+      'SELECT body, article_date as date, location FROM article_enrichments WHERE article_id = ?',
+      [id]
+    );
+    res.json({ success: true, body: row.body, date: row.date, location: row.location });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to enrich article' });
@@ -217,8 +219,12 @@ router.post('/:id/enrich', async (req, res) => {
 router.post('/:id/extract-date-location', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await extractDateLocation(db, configDb, id);
-    res.json({ success: true, ...result });
+    await processArticle(id, ['date']);
+    const row = await db.get(
+      'SELECT article_date as date, location FROM article_enrichments WHERE article_id = ?',
+      [id]
+    );
+    res.json({ success: true, date: row.date, location: row.location });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract date/location' });
@@ -229,8 +235,12 @@ router.post('/:id/extract-date-location', async (req, res) => {
 router.post('/:id/extract-parties', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await extractParties(db, configDb, openai, id);
-    res.json({ success: true, ...result });
+    await processArticle(id, ['parties']);
+    const row = await db.get(
+      'SELECT acquiror, seller, target, transaction_type FROM article_enrichments WHERE article_id = ?',
+      [id]
+    );
+    res.json({ success: true, acquiror: row.acquiror, seller: row.seller, target: row.target, transactionType: row.transaction_type });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract parties' });
@@ -238,12 +248,15 @@ router.post('/:id/extract-parties', async (req, res) => {
 });
 
 // Summarize article and classify sector/industry using GPT
-const summarizeArticle = require('../lib/enrichment/summarizeArticle');
 router.post('/:id/summarize', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await summarizeArticle(db, configDb, openai, id);
-    res.json({ success: true, ...result });
+    await processArticle(id, ['summary']);
+    const row = await db.get(
+      'SELECT summary, sector, industry FROM article_enrichments WHERE article_id = ?',
+      [id]
+    );
+    res.json({ success: true, summary: row.summary, sector: row.sector, industry: row.industry });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to summarize article' });
@@ -251,12 +264,15 @@ router.post('/:id/summarize', async (req, res) => {
 });
 
 // Extract deal value from the full text and improve location using GPT
-const extractValueAndLocation = require('../lib/enrichment/extractValueAndLocation');
 router.post('/:id/extract-value-location', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await extractValueAndLocation(db, configDb, openai, id);
-    res.json({ success: true, ...result });
+    await processArticle(id, ['value']);
+    const row = await db.get(
+      'SELECT deal_value, location FROM article_enrichments WHERE article_id = ?',
+      [id]
+    );
+    res.json({ success: true, dealValue: row.deal_value, location: row.location });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract value/location' });
