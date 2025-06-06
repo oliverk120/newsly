@@ -49,7 +49,7 @@
           <th class="border px-2 py-1">#</th>
           <th class="border px-2 py-1">Title</th>
           <th class="border px-2 py-1">Description</th>
-          <th class="border px-2 py-1">Time</th>
+          <th class="border px-2 py-1">Date/Time</th>
           <th class="border px-2 py-1">Link</th>
           <th class="border px-2 py-1">Match</th>
           <th class="border px-2 py-1">Body</th>
@@ -76,6 +76,11 @@
 
       const enrichSteps = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
 
+      function formatTime(text) {
+        if (!text) return '';
+        return /\bET\b/i.test(text) ? text : `${text} ET`;
+      }
+
       async function loadArticles() {
         const res = await fetch('/articles/enriched-list?level=all&all=1');
         const data = await res.json();
@@ -98,7 +103,7 @@
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1">${a.title}</td>` +
             `<td class="border px-2 py-1">${a.description}</td>` +
-            `<td class="border px-2 py-1">${a.time}</td>` +
+            `<td class="border px-2 py-1">${formatTime(a.time)}</td>` +
             `<td class="border px-2 py-1"><a class="text-blue-600 underline" href="${a.link}" target="_blank">Link</a></td>` +
             `<td class="border px-2 py-1 text-center">${pills}</td>` +
             stepCells;
@@ -125,21 +130,29 @@
       const pipelineForm = document.getElementById('pipelineForm');
       const runMissingBtn = document.getElementById('runMissingBtn');
 
-      scrapeEnrichBtn.addEventListener('click', async () => {
+      scrapeEnrichBtn.addEventListener('click', () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
         div.textContent = 'Running full pipeline...';
 
-        const res = await fetch('/scrape-enrich');
-        const data = await res.json();
-        div.innerHTML = data.details
-          .map(d => `${d.base_url}: scraped ${d.scraped}, added ${d.inserted}`)
-          .join('<br>');
-        div.innerHTML += `<br>Total enriched: ${data.enriched}`;
-        log.textContent = (data.logs || []).join('\n');
-        loadArticles();
-        loadStats();
+        const es = new EventSource('/scrape-enrich-stream');
+        es.onmessage = e => {
+          log.textContent += e.data + '\n';
+          log.scrollTop = log.scrollHeight;
+        };
+        es.addEventListener('done', e => {
+          es.close();
+          try {
+            const data = JSON.parse(e.data);
+            div.innerHTML = `Inserted total ${data.inserted} new articles` +
+              `<br>Total enriched: ${data.enriched}`;
+          } catch (_) {
+            div.textContent = 'Pipeline completed';
+          }
+          loadArticles();
+          loadStats();
+        });
       });
 
       runMissingBtn.addEventListener('click', async () => {
