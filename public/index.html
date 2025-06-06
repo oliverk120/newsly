@@ -14,13 +14,23 @@
     </nav>
     <h1 class="text-2xl font-bold mb-4">News Scraper</h1>
 
-    <div class="mb-4 flex items-center space-x-2">
-      <div class="inline-flex rounded-md shadow-sm" role="group">
-        <button id="scrapeBtn" class="px-4 py-2 bg-blue-300 hover:bg-blue-400 text-black">Scrape Articles</button>
-        <button id="runFiltersBtn" class="px-4 py-2 bg-blue-400 hover:bg-blue-500 text-black">Run Filters</button>
+    <div class="mb-4 space-y-2">
+      <div class="flex items-center space-x-2">
+        <div class="inline-flex rounded-md shadow-sm" role="group">
+          <button id="scrapeBtn" class="px-4 py-2 bg-blue-300 hover:bg-blue-400 text-black">Scrape Articles</button>
+          <button id="runFiltersBtn" class="px-4 py-2 bg-blue-400 hover:bg-blue-500 text-black">Run Filters</button>
+        </div>
       </div>
-      <button id="fullRunBtn" class="bg-green-600 text-white px-4 py-2 rounded">Run Full Pipeline</button>
-      <button id="stopBtn" class="bg-red-600 text-white px-4 py-2 rounded hidden">Stop</button>
+      <form id="pipelineForm" class="flex flex-wrap items-center space-x-2">
+        <label class="mr-2"><input type="checkbox" name="steps" value="body" checked> Body</label>
+        <label class="mr-2"><input type="checkbox" name="steps" value="date" checked> Date</label>
+        <label class="mr-2"><input type="checkbox" name="steps" value="parties" checked> Parties</label>
+        <label class="mr-2"><input type="checkbox" name="steps" value="summary" checked> Summary</label>
+        <label class="mr-2"><input type="checkbox" name="steps" value="value" checked> Value</label>
+        <label class="mr-2">Since <input type="date" name="since" class="border rounded px-1 ml-1" /></label>
+        <label class="mr-2"><input type="checkbox" name="incomplete" value="1"> Incomplete only</label>
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Run Pipeline</button>
+      </form>
     </div>
     <p class="text-sm text-gray-600 mb-2">Scrapes new articles, runs filters and enriches the matches.</p>
 
@@ -165,18 +175,7 @@
 
       const scrapeBtn = document.getElementById('scrapeBtn');
       const runFiltersBtn = document.getElementById('runFiltersBtn');
-      const fullRunBtn = document.getElementById('fullRunBtn');
-      const stopBtn = document.getElementById('stopBtn');
-
-      let es;
-      let totalEnrich = 0;
-      let progress = 0;
-
-      const updateBar = () => {
-        if (!totalEnrich) return;
-        const bar = Array.from({ length: totalEnrich }, (_, i) => i < progress ? '█' : '_').join('');
-        document.getElementById('scrapeLog').textContent = 'Enriching ' + bar;
-      };
+      const pipelineForm = document.getElementById('pipelineForm');
 
       scrapeBtn.addEventListener('click', async () => {
         const log = document.getElementById('scrapeLog');
@@ -207,60 +206,33 @@
         loadArticles();
       });
 
-      fullRunBtn.addEventListener('click', () => {
+      pipelineForm.addEventListener('submit', async e => {
+        e.preventDefault();
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
-        div.textContent = 'Running full pipeline...';
-        totalEnrich = 0;
-        progress = 0;
-        es = new EventSource('/scrape-enrich-stream');
-        stopBtn.classList.remove('hidden');
-        es.onmessage = e => {
-          if (e.data.startsWith('Enriching ') && e.data.endsWith(' articles')) {
-            const m = e.data.match(/Enriching (\d+) articles/);
-            if (m) {
-              totalEnrich = parseInt(m[1], 10);
-              progress = 0;
-              updateBar();
-              return;
-            }
-          }
-          const m = e.data.match(/^Enriched (\d+)/(\d+)/);
-          if (m) {
-            progress = parseInt(m[1], 10);
-            updateBar();
-            return;
-          }
-          log.textContent += e.data + '\n';
-          log.scrollTop = log.scrollHeight;
-        };
-        es.addEventListener('done', e => {
-          es.close();
-          stopBtn.classList.add('hidden');
-          try {
-            const data = JSON.parse(e.data);
-            if (!data.error) {
-              div.textContent = `Inserted ${data.inserted} new, enriched ${data.enriched}`;
-            } else {
-              div.textContent = 'Error: ' + data.error;
-            }
-          } catch {
-            div.textContent = 'Completed';
-          }
-          loadArticles();
-          loadStats();
-        });
-        es.onerror = () => {
-          es.close();
-          stopBtn.classList.add('hidden');
-        };
-      });
+        div.textContent = 'Running pipeline...';
 
-      stopBtn.addEventListener('click', async () => {
-        if (es) es.close();
-        stopBtn.classList.add('hidden');
-        await fetch('/stop-pipeline', { method: 'POST' });
+        const formData = new FormData(pipelineForm);
+        const steps = formData.getAll('steps');
+        const since = formData.get('since');
+        const incomplete = formData.get('incomplete');
+
+        const params = new URLSearchParams();
+        if (steps.length) params.set('steps', steps.join(','));
+        if (since) params.set('since', since);
+        if (incomplete) params.set('incomplete', '1');
+
+        const res = await fetch(`/pipeline/run?${params.toString()}`);
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          div.textContent = 'Error running pipeline';
+        } else {
+          div.textContent = `Processed ${data.processed} articles`;
+        }
+        log.textContent = (data.logs || []).join('\n');
+        loadArticles();
+        loadStats();
       });
 
       loadSources();
