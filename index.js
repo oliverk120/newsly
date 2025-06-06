@@ -376,6 +376,9 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     let insertedTotal = 0;
     let enrichedTotal = 0;
 
+    const toEnrich = [];
+
+
     for (const source of sources) {
       send(`Fetching ${source.base_url}`);
       let articles;
@@ -411,19 +414,26 @@ app.get('/scrape-enrich-stream', async (req, res) => {
           insertedIds
         );
         const matchedIds = rows.map(r => r.article_id);
-        for (const id of matchedIds) {
-          try {
-            await processArticle(id);
-            enrichedTotal++;
-            send(`Enriched article ${id}`);
-          } catch (e) {
-            send(`Failed to enrich article ${id}: ${e.message}`);
-          }
-        }
+
+        toEnrich.push(...matchedIds);
       }
     }
 
+    const totalToEnrich = toEnrich.length;
     send(`Inserted total ${insertedTotal} new articles`);
+    send(`Enriching ${totalToEnrich} articles`);
+    let count = 0;
+    for (const id of toEnrich) {
+      try {
+        await processArticle(id);
+        count++;
+        enrichedTotal++;
+        send(`Enriched ${count}/${totalToEnrich}`);
+      } catch (e) {
+        send(`Failed to enrich article ${id}: ${e.message}`);
+      }
+    }
+
     send(`Enriched total ${enrichedTotal} articles`);
     res.write(`event: done\ndata: ${JSON.stringify({ inserted: insertedTotal, enriched: enrichedTotal })}\n\n`);
     res.end();
