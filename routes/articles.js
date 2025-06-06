@@ -157,6 +157,8 @@ router.get('/enrich-list', async (req, res) => {
 // Get enriched articles with stats
 router.get('/enriched-list', async (req, res) => {
   const level = req.query.level || 'all';
+  const includeAll = req.query.all === '1' || req.query.all === 'true';
+
   const rows = await db.all(
     `SELECT a.id, a.title, a.description, a.time, a.link,
             GROUP_CONCAT(m.filter_id) as filter_ids,
@@ -166,8 +168,8 @@ router.get('/enriched-list', async (req, res) => {
             ae.summary, ae.sector, ae.industry
        FROM articles a
        LEFT JOIN article_filter_matches m ON a.id = m.article_id
-       JOIN article_enrichments ae ON a.id = ae.article_id
-      WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL
+       ${includeAll ? 'LEFT JOIN' : 'JOIN'} article_enrichments ae ON a.id = ae.article_id
+      ${includeAll ? '' : 'WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL'}
       GROUP BY a.id
       ORDER BY a.time DESC`
   );
