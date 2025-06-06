@@ -16,6 +16,7 @@
     <div class="mb-4 space-y-2">
       <button id="scrapeEnrichBtn" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded w-full">Scrape &amp; Enrich</button>
       <form id="pipelineForm" class="flex flex-wrap items-center space-x-2">
+        <label class="mr-2"><input type="checkbox" name="steps" value="filters" checked> Filters</label>
         <label class="mr-2"><input type="checkbox" name="steps" value="body" checked> Body</label>
         <label class="mr-2"><input type="checkbox" name="steps" value="date" checked> Date</label>
         <label class="mr-2"><input type="checkbox" name="steps" value="parties" checked> Parties</label>
@@ -154,7 +155,7 @@
         });
       });
 
-      runMissingBtn.addEventListener('click', async () => {
+      runMissingBtn.addEventListener('click', () => {
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
@@ -169,19 +170,25 @@
         if (since) params.set('since', since);
         params.set('incomplete', '1');
 
-        const res = await fetch(`/pipeline/run?${params.toString()}`);
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          div.textContent = 'Error running pipeline';
-        } else {
-          div.textContent = `Processed ${data.processed} articles`;
-        }
-        log.textContent = (data.logs || []).join('\n');
-        loadArticles();
-        loadStats();
+        const es = new EventSource(`/pipeline/run-stream?${params.toString()}`);
+        es.onmessage = e => {
+          log.textContent += e.data + '\n';
+          log.scrollTop = log.scrollHeight;
+        };
+        es.addEventListener('done', e => {
+          es.close();
+          try {
+            const data = JSON.parse(e.data);
+            div.textContent = `Processed ${data.processed} articles`;
+          } catch (_) {
+            div.textContent = 'Pipeline completed';
+          }
+          loadArticles();
+          loadStats();
+        });
       });
 
-      pipelineForm.addEventListener('submit', async e => {
+      pipelineForm.addEventListener('submit', e => {
         e.preventDefault();
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
@@ -198,16 +205,22 @@
         if (since) params.set('since', since);
         if (incomplete) params.set('incomplete', '1');
 
-        const res = await fetch(`/pipeline/run?${params.toString()}`);
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          div.textContent = 'Error running pipeline';
-        } else {
-          div.textContent = `Processed ${data.processed} articles`;
-        }
-        log.textContent = (data.logs || []).join('\n');
-        loadArticles();
-        loadStats();
+        const es = new EventSource(`/pipeline/run-stream?${params.toString()}`);
+        es.onmessage = e => {
+          log.textContent += e.data + '\n';
+          log.scrollTop = log.scrollHeight;
+        };
+        es.addEventListener('done', e => {
+          es.close();
+          try {
+            const data = JSON.parse(e.data);
+            div.textContent = `Processed ${data.processed} articles`;
+          } catch (_) {
+            div.textContent = 'Pipeline completed';
+          }
+          loadArticles();
+          loadStats();
+        });
       });
 
       loadArticles();
