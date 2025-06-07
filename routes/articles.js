@@ -26,6 +26,9 @@ const processArticle = createPipeline(db, configDb, openai);
 
 // Get all articles
 router.get('/', async (req, res) => {
+  const agg = db.raw.getDialect() === 'postgres'
+    ? "STRING_AGG(m.filter_id::text, ',')"
+    : 'GROUP_CONCAT(m.filter_id)';
   const query = `
     SELECT
       a.id,
@@ -33,7 +36,7 @@ router.get('/', async (req, res) => {
       a.description,
       a.time,
       a.link,
-      GROUP_CONCAT(m.filter_id) as filter_ids
+      ${agg} as filter_ids
     FROM articles a
     LEFT JOIN article_filter_matches m ON a.id = m.article_id
     GROUP BY a.id
@@ -159,9 +162,13 @@ router.get('/enriched-list', async (req, res) => {
   const level = req.query.level || 'all';
   const includeAll = req.query.all === '1' || req.query.all === 'true';
 
+  const agg = db.raw.getDialect() === 'postgres'
+    ? "STRING_AGG(m.filter_id::text, ',')"
+    : 'GROUP_CONCAT(m.filter_id)';
+
   const rows = await db.all(
     `SELECT a.id, a.title, a.description, a.time, a.link,
-            GROUP_CONCAT(m.filter_id) as filter_ids,
+            ${agg} as filter_ids,
             ae.body, ae.acquiror, ae.seller, ae.target,
             ae.deal_value, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
