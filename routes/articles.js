@@ -177,7 +177,11 @@ router.get('/enriched-list', async (req, res) => {
        LEFT JOIN article_filter_matches m ON a.id = m.article_id
        ${includeAll ? 'LEFT JOIN' : 'JOIN'} article_enrichments ae ON a.id = ae.article_id
       ${includeAll ? '' : 'WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL'}
-      GROUP BY a.id
+      GROUP BY a.id, a.title, a.description, a.time, a.link,
+               ae.body, ae.acquiror, ae.seller, ae.target,
+               ae.deal_value, ae.location, ae.article_date,
+               ae.transaction_type, ae.log,
+               ae.summary, ae.sector, ae.industry
       ORDER BY a.time DESC`
   );
 
