@@ -6,7 +6,8 @@ Articles can also be summarized with sector and industry labels using GPT.
 ## Prerequisites
 
 - Node.js 18 or newer (the repo uses Node.js 22 via the `.replit` config)
-- The server uses SQLite by default but can connect to Postgres via `DATABASE_URL`
+- The server uses SQLite when `NODE_ENV` is not `production`. In production a
+  Postgres connection is required via `DATABASE_URL`.
 - Scraping sources, filters and prompts are stored in `config.db`
 - To run enrichment routes you must set the `OPENAI_API_KEY` environment variable
 
@@ -32,8 +33,9 @@ The server listens on the port defined by `PORT` or defaults to `3000`.
 
 - `OPENAI_API_KEY` – required for enrichment endpoints
 - `PORT` – optional port number (defaults to `3000`)
-- `DATABASE_URL` – optional Postgres connection string
-- `CONFIG_DB_URL` – optional Postgres connection for config data
+- `NODE_ENV` – set to `production` to use Postgres
+- `DATABASE_URL` – Postgres connection string (required in production)
+- `CONFIG_DB_URL` – Postgres connection for config data (required in production)
 
 ## Project structure
 

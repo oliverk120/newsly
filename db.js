@@ -2,7 +2,11 @@ const { Sequelize, QueryTypes } = require('sequelize');
 const path = require('path');
 
 let sequelize;
-if (process.env.DATABASE_URL) {
+const isProd = process.env.NODE_ENV === 'production';
+if (isProd) {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL must be set in production');
+  }
   sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
 } else {
   sequelize = new Sequelize({
