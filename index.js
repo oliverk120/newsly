@@ -14,6 +14,23 @@ const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const processArticle = createPipeline(db, configDb, openai);
 
+const isPg = db.raw.getDialect() === 'postgres';
+const configIsPg = configDb.raw.getDialect() === 'postgres';
+const idColumn = isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
+const configIdColumn = configIsPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
+
+async function hasColumn(database, table, column) {
+  if (database.raw.getDialect() === 'postgres') {
+    const row = await database.get(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+      [table, column]
+    );
+    return !!row;
+  }
+  const info = await database.all(`PRAGMA table_info(${table})`);
+  return info.some(r => r.name === column);
+}
+
 let stopPipeline = false;
 
 // Serve static files
@@ -23,7 +40,7 @@ app.use(express.json());
 // Initialize SQLite database
 async function initDb() {
   await db.run(`CREATE TABLE IF NOT EXISTS articles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id ${idColumn},
     title TEXT,
     description TEXT,
     time TEXT,
@@ -33,7 +50,7 @@ async function initDb() {
   )`);
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS filters (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id ${configIdColumn},
     name TEXT,
     type TEXT NOT NULL, -- 'keyword' or 'embedding'
     value TEXT,
@@ -42,7 +59,7 @@ async function initDb() {
   )`);
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id ${idColumn},
     article_id INTEGER,
     filter_id INTEGER,
     matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -86,10 +103,10 @@ async function initDb() {
       }
       if (r.embedding && !steps.includes('embedding')) steps.push('embedding');
       for (const s of steps) {
-        await db.run(
-          'INSERT OR IGNORE INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?)',
-          [r.article_id, s]
-        );
+        const sql = isPg
+          ? 'INSERT INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?) ON CONFLICT DO NOTHING'
+          : 'INSERT OR IGNORE INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?)';
+        await db.run(sql, [r.article_id, s]);
       }
     }
   }
@@ -141,46 +158,45 @@ async function initDb() {
     );
   }
 
-  const aeInfo = await db.all('PRAGMA table_info(article_enrichments)');
-  const hasBody = aeInfo.some(r => r.name === 'body');
+  const hasBody = await hasColumn(db, 'article_enrichments', 'body');
   if (!hasBody) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
   }
-  const hasSeller = aeInfo.some(r => r.name === 'seller');
+  const hasSeller = await hasColumn(db, 'article_enrichments', 'seller');
   if (!hasSeller) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN seller TEXT');
   }
-  const hasCompleted = aeInfo.some(r => r.name === 'completed');
+  const hasCompleted = await hasColumn(db, 'article_enrichments', 'completed');
   if (!hasCompleted) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN completed TEXT');
   }
-  const hasDate = aeInfo.some(r => r.name === 'article_date');
+  const hasDate = await hasColumn(db, 'article_enrichments', 'article_date');
   if (!hasDate) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN article_date TEXT');
   }
-  const hasLocation = aeInfo.some(r => r.name === 'location');
+  const hasLocation = await hasColumn(db, 'article_enrichments', 'location');
   if (!hasLocation) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN location TEXT');
   }
-  const hasTx = aeInfo.some(r => r.name === 'transaction_type');
+  const hasTx = await hasColumn(db, 'article_enrichments', 'transaction_type');
   if (!hasTx) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT');
   }
-  const hasLog = aeInfo.some(r => r.name === 'log');
+  const hasLog = await hasColumn(db, 'article_enrichments', 'log');
   if (!hasLog) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
   }
-  const hasSummary = aeInfo.some(r => r.name === 'summary');
+  const hasSummary = await hasColumn(db, 'article_enrichments', 'summary');
   if (!hasSummary) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN summary TEXT');
   }
-  const hasSector = aeInfo.some(r => r.name === 'sector');
+  const hasSector = await hasColumn(db, 'article_enrichments', 'sector');
   if (!hasSector) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN sector TEXT');
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id ${configIdColumn},
     base_url TEXT,
     article_selector TEXT,
     title_selector TEXT,
@@ -193,16 +209,15 @@ async function initDb() {
     date_selector TEXT
   )`);
 
-  const srcInfo = await configDb.all('PRAGMA table_info(sources)');
-  const hasBodySel = srcInfo.some(r => r.name === 'body_selector');
+  const hasBodySel = await hasColumn(configDb, 'sources', 'body_selector');
   if (!hasBodySel) {
     await configDb.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
   }
-  const hasLocationSel = srcInfo.some(r => r.name === 'location_selector');
+  const hasLocationSel = await hasColumn(configDb, 'sources', 'location_selector');
   if (!hasLocationSel) {
     await configDb.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
   }
-  const hasDateSel = srcInfo.some(r => r.name === 'date_selector');
+  const hasDateSel = await hasColumn(configDb, 'sources', 'date_selector');
   if (!hasDateSel) {
     await configDb.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
   }
@@ -290,11 +305,11 @@ app.get('/scrape', async (req, res) => {
         continue;
       }
 
+      const articleSql = isPg
+        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
+        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
       const insertPromises = articles.map(a =>
-        db.run(
-          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
-          [a.title, a.description, a.time, a.link, a.image]
-        )
+        db.run(articleSql, [a.title, a.description, a.time, a.link, a.image])
       );
 
       const results = await Promise.all(insertPromises);
@@ -346,11 +361,11 @@ app.get('/scrape-enrich', async (req, res) => {
         continue;
       }
 
+      const insertSql = isPg
+        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
+        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
       const insertPromises = articles.map(a =>
-        db.run(
-          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
-          [a.title, a.description, a.time, a.link, a.image]
-        )
+        db.run(insertSql, [a.title, a.description, a.time, a.link, a.image])
       );
 
       const results = await Promise.all(insertPromises);
@@ -437,11 +452,11 @@ app.get('/scrape-enrich-stream', async (req, res) => {
         continue;
       }
 
+      const insertArticle = isPg
+        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
+        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
       const insertPromises = articles.map(a =>
-        db.run(
-          'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)',
-          [a.title, a.description, a.time, a.link, a.image]
-        )
+        db.run(insertArticle, [a.title, a.description, a.time, a.link, a.image])
       );
 
       const results = await Promise.all(insertPromises);
