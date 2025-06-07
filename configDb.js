@@ -1,39 +1,22 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const prisma = require('./prismaClient');
 
-const connection = new sqlite3.Database(
-  path.join(__dirname, 'config.db')
-);
-
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve({ lastID: this.lastID, changes: this.changes });
-    });
-  });
+async function run(sql, params = []) {
+  const changes = await prisma.$executeRawUnsafe(sql, ...params);
+  return { lastID: 0, changes: typeof changes === 'number' ? changes : 0 };
 }
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
+async function get(sql, params = []) {
+  const rows = await prisma.$queryRawUnsafe(sql, ...params);
+  return rows[0] || null;
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+async function all(sql, params = []) {
+  const rows = await prisma.$queryRawUnsafe(sql, ...params);
+  return rows;
 }
 
 function serialize(fn) {
-  connection.serialize(fn);
+  return fn();
 }
 
-module.exports = { run, get, all, serialize, raw: connection };
+module.exports = { run, get, all, serialize, raw: prisma };
