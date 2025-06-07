@@ -18,18 +18,6 @@ Install dependencies using npm before running the server:
 npm install
 ```
 
-After installing dependencies run the Prisma generator to create the client:
-
-```bash
-npm run prisma:generate
-```
-
-To apply schema changes use the migration command:
-
-```bash
-npm run prisma:migrate
-```
-
 ## Running the server
 
 Start the server with:
@@ -48,7 +36,7 @@ The server listens on the port defined by `PORT` or defaults to `3000`.
 ## Project structure
 
 - `index.js` – main entry point and Express setup
- - `db.js` – Prisma wrapper around the SQLite database
+- `db.js` – SQLite database connection
 - `routes/` – route handlers for articles, sources and filters
 - `lib/` – utility modules (scraping, filtering, enrichment)
 - `public/` – static client pages
