@@ -246,12 +246,30 @@ async function initDb() {
   }
 }
 
-initDb().catch(err => console.error('Failed to init db', err));
-app.use('/articles', require('./routes/articles'));
-app.use('/sources', require('./routes/sources'));
-app.use('/filters', require('./routes/filters'));
-app.use('/prompts', require('./routes/prompts'));
-app.use('/pipeline', require('./routes/pipeline'));
+async function startServer() {
+  try {
+    await initDb();
+  } catch (err) {
+    console.error('Failed to init db', err);
+    process.exit(1);
+  }
+
+  app.use('/articles', require('./routes/articles'));
+  app.use('/sources', require('./routes/sources'));
+  app.use('/filters', require('./routes/filters'));
+  app.use('/prompts', require('./routes/prompts'));
+  app.use('/pipeline', require('./routes/pipeline'));
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  // Run the full scrape & enrich pipeline once every 24 hours
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  setInterval(runScheduledPipeline, DAY_MS);
+}
+
+startServer();
 
 
 
@@ -539,12 +557,7 @@ app.get('/run-filters', async (req, res) => {
 });
 
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
 // Run the full scrape & enrich pipeline once every 24 hours
-const DAY_MS = 24 * 60 * 60 * 1000;
 async function runScheduledPipeline() {
   try {
     const res = await fetch(`http://localhost:${PORT}/scrape-enrich`);
@@ -554,4 +567,3 @@ async function runScheduledPipeline() {
     console.error('Scheduled pipeline failed', err);
   }
 }
-setInterval(runScheduledPipeline, DAY_MS);
