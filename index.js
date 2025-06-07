@@ -14,13 +14,15 @@ const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const processArticle = createPipeline(db, configDb, openai);
 
-const isPg = db.raw.getDialect() === 'postgres';
-const configIsPg = configDb.raw.getDialect() === 'postgres';
+const isPg = db.raw?.getDialect() === 'postgres';
+const configIsPg = configDb.raw?.getDialect() === 'postgres';
 const idColumn = isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
 const configIdColumn = configIsPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
+const dateTime = isPg ? 'TIMESTAMP' : 'DATETIME';
+const configDateTime = configIsPg ? 'TIMESTAMP' : 'DATETIME';
 
 async function hasColumn(database, table, column) {
-  if (database.raw.getDialect() === 'postgres') {
+  if (database.raw?.getDialect() === 'postgres') {
     const row = await database.get(
       `SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
       [table, column]
@@ -46,7 +48,7 @@ async function initDb() {
     time TEXT,
     link TEXT UNIQUE,
     image TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at ${dateTime} DEFAULT CURRENT_TIMESTAMP
   )`);
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS filters (
@@ -55,14 +57,14 @@ async function initDb() {
     type TEXT NOT NULL, -- 'keyword' or 'embedding'
     value TEXT,
     active INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at ${configDateTime} DEFAULT CURRENT_TIMESTAMP
   )`);
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
     id ${idColumn},
     article_id INTEGER,
     filter_id INTEGER,
-    matched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    matched_at ${dateTime} DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
@@ -88,7 +90,7 @@ async function initDb() {
   await db.run(`CREATE TABLE IF NOT EXISTS article_enrichment_steps (
     article_id INTEGER,
     step_name TEXT,
-    completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at ${dateTime} DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(article_id, step_name),
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);

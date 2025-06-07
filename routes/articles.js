@@ -26,7 +26,7 @@ const processArticle = createPipeline(db, configDb, openai);
 
 // Get all articles
 router.get('/', async (req, res) => {
-  const agg = db.raw.getDialect() === 'postgres'
+  const agg = db.raw && db.raw.getDialect() === 'postgres'
     ? "STRING_AGG(m.filter_id::text, ',')"
     : 'GROUP_CONCAT(m.filter_id)';
   const query = `
@@ -162,7 +162,7 @@ router.get('/enriched-list', async (req, res) => {
   const level = req.query.level || 'all';
   const includeAll = req.query.all === '1' || req.query.all === 'true';
 
-  const agg = db.raw.getDialect() === 'postgres'
+  const agg = db.raw && db.raw.getDialect() === 'postgres'
     ? "STRING_AGG(m.filter_id::text, ',')"
     : 'GROUP_CONCAT(m.filter_id)';
 
