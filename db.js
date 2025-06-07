@@ -1,39 +1,43 @@
-const sqlite3 = require('sqlite3').verbose();
+const { Sequelize, QueryTypes } = require('sequelize');
 const path = require('path');
 
-const connection = new sqlite3.Database(
-  path.join(__dirname, 'raw_articles.db')
-);
-
-function run(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve({ lastID: this.lastID, changes: this.changes });
-    });
+let sequelize;
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+} else {
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: path.join(__dirname, 'raw_articles.db'),
+    logging: false
   });
 }
 
-function get(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
+async function run(sql, params = []) {
+  const [, metadata] = await sequelize.query(sql, { replacements: params });
+  const changes =
+    typeof metadata.rowCount === 'number'
+      ? metadata.rowCount
+      : metadata.changes || 0;
+  return { lastID: metadata.lastID, changes };
+}
+
+async function get(sql, params = []) {
+  const rows = await sequelize.query(sql, {
+    replacements: params,
+    type: QueryTypes.SELECT
+  });
+  return rows[0];
+}
+
+async function all(sql, params = []) {
+  return sequelize.query(sql, {
+    replacements: params,
+    type: QueryTypes.SELECT
   });
 }
 
-function all(sql, params = []) {
-  return new Promise((resolve, reject) => {
-    connection.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
+async function serialize(fn) {
+  await fn();
 }
 
-function serialize(fn) {
-  connection.serialize(fn);
-}
-
-module.exports = { run, get, all, serialize, raw: connection };
+module.exports = { run, get, all, serialize, raw: sequelize };

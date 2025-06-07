@@ -1,12 +1,12 @@
 # Newsly
 
-Newsly is a small Express application that scrapes news sources and stores articles in a SQLite database. Optional enrichment tasks use the OpenAI API to extract M&A details. When extracting the acquiror, seller and target, the same request also classifies whether the article is about an "M&A" transaction, a "Financing" or "Other".
+Newsly is a small Express application that scrapes news sources and stores articles in a database managed via [Sequelize](https://sequelize.org/). Optional enrichment tasks use the OpenAI API to extract M&A details. When extracting the acquiror, seller and target, the same request also classifies whether the article is about an "M&A" transaction, a "Financing" or "Other".
 Articles can also be summarized with sector and industry labels using GPT.
 
 ## Prerequisites
 
 - Node.js 18 or newer (the repo uses Node.js 22 via the `.replit` config)
-- The server uses a local SQLite database at `raw_articles.db`
+- The server uses SQLite by default but can connect to Postgres via `DATABASE_URL`
 - Scraping sources, filters and prompts are stored in `config.db`
 - To run enrichment routes you must set the `OPENAI_API_KEY` environment variable
 
@@ -32,11 +32,13 @@ The server listens on the port defined by `PORT` or defaults to `3000`.
 
 - `OPENAI_API_KEY` – required for enrichment endpoints
 - `PORT` – optional port number (defaults to `3000`)
+- `DATABASE_URL` – optional Postgres connection string
+- `CONFIG_DB_URL` – optional Postgres connection for config data
 
 ## Project structure
 
 - `index.js` – main entry point and Express setup
-- `db.js` – SQLite database connection
+- `db.js` – database helper using Sequelize
 - `routes/` – route handlers for articles, sources and filters
 - `lib/` – utility modules (scraping, filtering, enrichment)
 - `public/` – static client pages
