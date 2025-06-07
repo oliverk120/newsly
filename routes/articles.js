@@ -236,7 +236,8 @@ router.post('/:id/enrich', async (req, res) => {
     res.json({ success: true, body: row.body, date: row.date, location: row.location });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to enrich article' });
+    const msg = err && err.message ? err.message : 'Failed to enrich article';
+    res.status(500).json({ error: msg });
   }
 });
 
