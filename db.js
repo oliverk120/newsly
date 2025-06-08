@@ -17,12 +17,13 @@ if (isProd) {
 }
 
 async function run(sql, params = []) {
-  const [, metadata] = await sequelize.query(sql, { replacements: params });
+  const [result, metadata] = await sequelize.query(sql, { replacements: params });
+  const meta = metadata || result || {};
   const changes =
-    typeof metadata.rowCount === 'number'
-      ? metadata.rowCount
-      : metadata.changes || 0;
-  return { lastID: metadata.lastID, changes };
+    typeof meta.rowCount === 'number'
+      ? meta.rowCount
+      : meta.changes || 0;
+  return { lastID: meta.lastID, changes };
 }
 
 async function get(sql, params = []) {
