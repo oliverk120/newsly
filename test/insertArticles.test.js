@@ -10,6 +10,7 @@ function createDb(options) {
       if (options.isPg) {
         // Postgres style: no lastID returned
         inserted.push({ id, params });
+        if (options.missingRowCount) return {};
         return { changes: 1 };
       }
       inserted.push({ id, params });
@@ -41,4 +42,14 @@ test('fetches IDs when lastID is missing (postgres)', async () => {
   const { inserted, insertedIds } = await insertArticles(db, articles, true);
   assert.equal(inserted, 1);
   assert.deepEqual(insertedIds, [10]);
+});
+
+test('handles missing rowCount by verifying row existence', async () => {
+  const db = createDb({ nextId: 20, isPg: true, missingRowCount: true });
+  const articles = [
+    { title: 't3', description: '', time: '3', link: 'c', image: null }
+  ];
+  const { inserted, insertedIds } = await insertArticles(db, articles, true);
+  assert.equal(inserted, 1);
+  assert.deepEqual(insertedIds, [20]);
 });

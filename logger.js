@@ -7,6 +7,7 @@ if (!fs.existsSync(logDir)) {
 }
 
 const logPath = path.join(logDir, 'app.log');
+const debugEnabled = process.env.DEBUG === '1' || process.env.DEBUG === 'true';
 
 function write(level, message) {
   const line = `${new Date().toISOString()} ${level}: ${message}\n`;
@@ -17,4 +18,8 @@ module.exports = {
   info: msg => write('INFO', msg),
   error: msg =>
     write('ERROR', msg instanceof Error ? msg.stack || msg.message : msg)
+  ,
+  debug: msg => {
+    if (debugEnabled) write('DEBUG', msg);
+  }
 };
