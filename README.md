@@ -35,6 +35,7 @@ The server listens on the port defined by `PORT` or defaults to `3000`.
 - `PORT` – optional port number (defaults to `3000`)
 - `NODE_ENV` – set to `production` to use Postgres
 - `DATABASE_URL` – Postgres connection string (required in production)
+- `DEBUG` – set to `1` to log detailed DB operations
 
 ## Project structure
 
