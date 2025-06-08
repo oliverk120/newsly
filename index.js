@@ -6,6 +6,7 @@ const { runFilters } = require('./lib/filters');
 const { scrapeSource } = require('./lib/scraper');
 const { OpenAI } = require('openai');
 const createPipeline = require('./lib/enrichment/pipeline');
+const insertArticles = require('./lib/insertArticles');
 const addLog = require('./lib/addLog');
 const logger = require('./logger');
 
@@ -344,18 +345,12 @@ app.get('/scrape', async (req, res) => {
         continue;
       }
 
-      const articleSql = isPg
-        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
-        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
-      const insertPromises = articles.map(a =>
-        db.run(articleSql, [a.title, a.description, a.time, a.link, a.image])
-      );
-
-      const results = await Promise.all(insertPromises);
-      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
-      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
+      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
       insertedTotal += inserted;
       addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
+      if (insertedIds.length) {
+        addLog(logs, `New article IDs: ${insertedIds.join(', ')}`);
+      }
       if (insertedIds.length) {
 
         await runFilters(db, configDb, insertedIds, logs);
@@ -400,18 +395,12 @@ app.get('/scrape-enrich', async (req, res) => {
         continue;
       }
 
-      const insertSql = isPg
-        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
-        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
-      const insertPromises = articles.map(a =>
-        db.run(insertSql, [a.title, a.description, a.time, a.link, a.image])
-      );
-
-      const results = await Promise.all(insertPromises);
-      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
-      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
+      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
       insertedTotal += inserted;
       addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
+      if (insertedIds.length) {
+        addLog(logs, `New article IDs: ${insertedIds.join(', ')}`);
+      }
 
       if (insertedIds.length) {
         await runFilters(db, configDb, insertedIds, logs);
@@ -494,18 +483,12 @@ app.get('/scrape-enrich-stream', async (req, res) => {
         continue;
       }
 
-      const insertArticle = isPg
-        ? 'INSERT INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
-        : 'INSERT OR IGNORE INTO articles (title, description, time, link, image) VALUES (?, ?, ?, ?, ?)';
-      const insertPromises = articles.map(a =>
-        db.run(insertArticle, [a.title, a.description, a.time, a.link, a.image])
-      );
-
-      const results = await Promise.all(insertPromises);
-      const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
-      const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
+      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
       insertedTotal += inserted;
       send(`Inserted ${inserted} new articles from ${source.base_url}`);
+      if (insertedIds.length) {
+        send(`New article IDs: ${insertedIds.join(', ')}`);
+      }
 
       if (insertedIds.length) {
         await runFilters(db, configDb, insertedIds, logs);
