@@ -4,6 +4,7 @@ const db = require('../db');
 const configDb = require('../configDb');
 const createPipeline = require('../lib/enrichment/pipeline');
 const { getCompleted } = require('../lib/enrichment/steps');
+const addLog = require('../lib/addLog');
 
 const router = express.Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -42,7 +43,7 @@ router.get('/run', async (req, res) => {
     let processed = 0;
     const logs = [];
 
-    for (const id of ids) {
+      for (const id of ids) {
       if (incompleteOnly) {
         const completed = await getCompleted(db, id);
         const missing = steps.filter(s => !completed.includes(s));
@@ -51,14 +52,14 @@ router.get('/run', async (req, res) => {
       try {
         await processArticle(id, steps);
         processed++;
-      } catch (e) {
-        logs.push(`Failed to process article ${id}: ${e.message}`);
+        } catch (e) {
+          addLog(logs, `Failed to process article ${id}: ${e.message}`);
+        }
       }
-    }
 
     res.json({ processed, logs });
   } catch (err) {
-    console.error(err);
+    addLog(null, `Error: ${err.message}`);
     res.status(500).json({ error: 'Failed to run pipeline' });
   }
 });
@@ -122,7 +123,7 @@ router.get('/run-stream', async (req, res) => {
     res.write(`event: done\ndata: ${JSON.stringify({ processed })}\n\n`);
     res.end();
   } catch (err) {
-    console.error(err);
+    addLog(null, `Error: ${err.message}`);
     send(`Error: ${err.message}`);
     res.write(`event: done\ndata: ${JSON.stringify({ error: 'Failed to run pipeline' })}\n\n`);
     res.end();

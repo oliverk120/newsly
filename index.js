@@ -6,6 +6,8 @@ const { runFilters } = require('./lib/filters');
 const { scrapeSource } = require('./lib/scraper');
 const { OpenAI } = require('openai');
 const createPipeline = require('./lib/enrichment/pipeline');
+const addLog = require('./lib/addLog');
+const logger = require('./logger');
 
 
 
@@ -267,7 +269,7 @@ async function startServer() {
   try {
     await initDb();
   } catch (err) {
-    console.error('Failed to init db', err);
+    logger.error('Failed to init db', err);
     process.exit(1);
   }
 
@@ -278,7 +280,7 @@ async function startServer() {
   app.use('/pipeline', require('./routes/pipeline'));
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
+    logger.info(`Server running on port ${PORT}`);
   });
 
   // Run the full scrape & enrich pipeline once every 24 hours
@@ -313,7 +315,7 @@ app.get('/stats', async (req, res) => {
       bySource
     });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: 'Failed to retrieve stats' });
   }
 });
@@ -326,19 +328,19 @@ app.get('/scrape', async (req, res) => {
   try {
     const sources = await configDb.all('SELECT * FROM sources');
 
-    logs.push(`Found ${sources.length} sources`);
+    addLog(logs, `Found ${sources.length} sources`);
 
     let insertedTotal = 0;
     const details = [];
 
     for (const source of sources) {
-      logs.push(`Fetching ${source.base_url}`);
+      addLog(logs, `Fetching ${source.base_url}`);
       let articles;
       try {
         articles = await scrapeSource(source);
-        logs.push(`Loaded ${articles.length} articles from ${source.base_url}`);
+        addLog(logs, `Loaded ${articles.length} articles from ${source.base_url}`);
       } catch (e) {
-        logs.push(`Failed to fetch ${source.base_url}: ${e.message}`);
+        addLog(logs, `Failed to fetch ${source.base_url}: ${e.message}`);
         continue;
       }
 
@@ -353,7 +355,7 @@ app.get('/scrape', async (req, res) => {
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
       const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
       insertedTotal += inserted;
-      logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
+      addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
 
         await runFilters(db, configDb, insertedIds, logs);
@@ -367,11 +369,11 @@ app.get('/scrape', async (req, res) => {
       });
     }
 
-    logs.push(`Inserted total ${insertedTotal} new articles`);
+    addLog(logs, `Inserted total ${insertedTotal} new articles`);
     res.json({ inserted: insertedTotal, details, logs });
   } catch (err) {
-    console.error(err);
-    logs.push(`Error: ${err.message}`);
+    logger.error(err);
+    addLog(logs, `Error: ${err.message}`);
     res.status(500).json({ error: 'Scraping failed', logs });
   }
 });
@@ -381,20 +383,20 @@ app.get('/scrape-enrich', async (req, res) => {
   const logs = [];
   try {
     const sources = await configDb.all('SELECT * FROM sources');
-    logs.push(`Found ${sources.length} sources`);
+    addLog(logs, `Found ${sources.length} sources`);
 
     let insertedTotal = 0;
     let enrichedTotal = 0;
     const details = [];
 
     for (const source of sources) {
-      logs.push(`Fetching ${source.base_url}`);
+      addLog(logs, `Fetching ${source.base_url}`);
       let articles;
       try {
         articles = await scrapeSource(source);
-        logs.push(`Loaded ${articles.length} articles from ${source.base_url}`);
+        addLog(logs, `Loaded ${articles.length} articles from ${source.base_url}`);
       } catch (e) {
-        logs.push(`Failed to fetch ${source.base_url}: ${e.message}`);
+        addLog(logs, `Failed to fetch ${source.base_url}: ${e.message}`);
         continue;
       }
 
@@ -409,7 +411,7 @@ app.get('/scrape-enrich', async (req, res) => {
       const inserted = results.reduce((acc, cur) => acc + cur.changes, 0);
       const insertedIds = results.filter(r => r.changes > 0).map(r => r.lastID);
       insertedTotal += inserted;
-      logs.push(`Inserted ${inserted} new articles from ${source.base_url}`);
+      addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
 
       if (insertedIds.length) {
         await runFilters(db, configDb, insertedIds, logs);
@@ -426,11 +428,11 @@ app.get('/scrape-enrich', async (req, res) => {
             enrichedTotal++;
             enrichedIds.push(id);
           } catch (e) {
-            logs.push(`Failed to enrich article ${id}: ${e.message}`);
+            addLog(logs, `Failed to enrich article ${id}: ${e.message}`);
           }
         }
         if (enrichedIds.length) {
-          logs.push(`Enriched article ${enrichedIds.join(', ')}`);
+          addLog(logs, `Enriched article ${enrichedIds.join(', ')}`);
         }
       }
 
@@ -442,12 +444,12 @@ app.get('/scrape-enrich', async (req, res) => {
       });
     }
 
-    logs.push(`Inserted total ${insertedTotal} new articles`);
-    logs.push(`Enriched total ${enrichedTotal} articles`);
+    addLog(logs, `Inserted total ${insertedTotal} new articles`);
+    addLog(logs, `Enriched total ${enrichedTotal} articles`);
     res.json({ inserted: insertedTotal, enriched: enrichedTotal, details, logs });
   } catch (err) {
-    console.error(err);
-    logs.push(`Error: ${err.message}`);
+    logger.error(err);
+    addLog(logs, `Error: ${err.message}`);
     res.status(500).json({ error: 'Full scrape failed', logs });
   }
 });
@@ -461,7 +463,10 @@ app.get('/scrape-enrich-stream', async (req, res) => {
   res.flushHeaders();
 
   const logs = [];
-  const send = msg => res.write(`data: ${msg}\n\n`);
+  const send = msg => {
+    addLog(null, msg);
+    res.write(`data: ${msg}\n\n`);
+  };
 
   try {
     const sources = await configDb.all('SELECT * FROM sources');
@@ -542,7 +547,7 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     res.write(`event: done\ndata: ${JSON.stringify({ inserted: insertedTotal, enriched: enrichedTotal })}\n\n`);
     res.end();
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     send(`Error: ${err.message}`);
     res.write(`event: done\ndata: ${JSON.stringify({ error: 'Full scrape failed' })}\n\n`);
     res.end();
@@ -562,13 +567,13 @@ app.get('/run-filters', async (req, res) => {
     const ids = rows.map(r => r.id);
 
     await db.run('DELETE FROM article_filter_matches');
-    logs.push('Cleared previous filter matches');
+    addLog(logs, 'Cleared previous filter matches');
 
     await runFilters(db, configDb, ids, logs);
     res.json({ processed: ids.length, logs });
   } catch (err) {
-    console.error(err);
-    logs.push(`Error: ${err.message}`);
+    logger.error(err);
+    addLog(logs, `Error: ${err.message}`);
     res.status(500).json({ error: 'Failed to run filters', logs });
   }
 });
@@ -579,8 +584,8 @@ async function runScheduledPipeline() {
   try {
     const res = await fetch(`http://localhost:${PORT}/scrape-enrich`);
     const data = await res.json();
-    console.log('Scheduled pipeline result:', data);
+    logger.info(`Scheduled pipeline result: ${JSON.stringify(data)}`);
   } catch (err) {
-    console.error('Scheduled pipeline failed', err);
+    logger.error('Scheduled pipeline failed', err);
   }
 }
