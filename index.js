@@ -68,6 +68,23 @@ async function initDb() {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
+  const dedupeSql = isPg
+    ? `DELETE FROM article_filter_matches a USING article_filter_matches b
+        WHERE a.id < b.id
+          AND a.article_id = b.article_id
+          AND a.filter_id = b.filter_id`
+    : `DELETE FROM article_filter_matches
+        WHERE rowid NOT IN (
+          SELECT MIN(rowid)
+          FROM article_filter_matches
+          GROUP BY article_id, filter_id
+        )`;
+  await db.run(dedupeSql);
+
+  await db.run(
+    'CREATE UNIQUE INDEX IF NOT EXISTS idx_article_filter_unique ON article_filter_matches(article_id, filter_id)'
+  );
+
   await db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
     article_id INTEGER PRIMARY KEY,
     embedding TEXT,
