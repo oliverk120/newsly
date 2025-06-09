@@ -21,19 +21,21 @@ npm install
 
 ## Running the server
 
-Start the server with:
+Start the server in either development or production mode:
 
 ```bash
-npm start
+npm run dev  # sets NODE_ENV=development
+npm run prod # sets NODE_ENV=production
 ```
 
-The server listens on the port defined by `PORT` or defaults to `3000`.
+The default `npm start` command still runs `index.js` without setting
+`NODE_ENV`. The server listens on the port defined by `PORT` or defaults to `3000`.
 
 ### Environment variables
 
 - `OPENAI_API_KEY` – required for enrichment endpoints
 - `PORT` – optional port number (defaults to `3000`)
-- `NODE_ENV` – set to `production` to use Postgres
+- `NODE_ENV` – automatically set by the scripts above; `production` uses Postgres
 - `DATABASE_URL` – Postgres connection string (required in production)
 - `DEBUG` – set to `1` to log detailed DB operations
 
@@ -60,7 +62,7 @@ At the time of writing all **14** tests pass.
 
 ```bash
 # start on a different port
-PORT=4000 npm start
+PORT=4000 npm run dev
 ```
 
 ## Keyword filters
