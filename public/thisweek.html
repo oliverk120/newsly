@@ -79,18 +79,21 @@
     <div id="datePills" class="mb-4 flex flex-wrap gap-2">
       <span
         data-range="week"
+        data-label="This Week"
         class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-blue-500 text-white"
         >This Week</span
       >
 
       <span
         data-range="month"
+        data-label="This Month"
         class="date-pill cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500"
         >This Month</span
       >
 
       <span
         data-range="year"
+        data-label="This Year"
         class="cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500"
         >This Year</span
       >
@@ -132,7 +135,13 @@
 
       function updateDatePills() {
         document.querySelectorAll(".date-pill").forEach((pill) => {
-          if (pill.dataset.range === filters.dateRange) {
+          const range = pill.dataset.range;
+          const count = getRows(undefined, range).length;
+          const label = pill.dataset.label || pill.textContent;
+          pill.dataset.label = label;
+          pill.textContent = `${label} (${count})`;
+
+          if (range === filters.dateRange) {
             pill.classList.remove("bg-gray-200");
             pill.classList.add("bg-blue-500", "text-white");
           } else if (!pill.classList.contains("cursor-not-allowed")) {
@@ -191,7 +200,8 @@
         return `${icon} ${sector}<br>${industry}`;
       }
 
-      function getRows(ignore) {
+      function getRows(ignore, rangeOverride) {
+        const dateRange = rangeOverride || filters.dateRange;
         return allArticles.filter((a) => {
           if (
             ignore !== "sector" &&
@@ -211,27 +221,31 @@
             a.valueBucket !== filters.dealValue
           )
             return false;
-          if (filters.dateRange) {
+          if (dateRange && a.article_date && !isNaN(Date.parse(a.article_date))) {
             const d = new Date(a.article_date);
-            if (isFinite(d)) {
-              const now = new Date();
-              let start, end;
-              if (filters.dateRange === "week") {
-                const day = now.getDay();
-                const diff = (day === 0 ? -6 : 1) - day;
-                start = new Date(now);
-                start.setHours(0, 0, 0, 0);
-                start.setDate(start.getDate() + diff);
-                end = new Date(start);
-                end.setDate(start.getDate() + 7);
-              } else if (filters.dateRange === "month") {
-                start = new Date(now.getFullYear(), now.getMonth(), 1);
-                end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-              } else if (filters.dateRange === "year") {
-                start = new Date(now.getFullYear(), 0, 1);
-                end = new Date(now.getFullYear() + 1, 0, 1);
-              }
-              if (start && end && (d < start || d >= end)) return false;
+            const now = new Date();
+            const nowET = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+            const tzDiff = now.getTime() - nowET.getTime();
+            let start, end;
+            if (dateRange === "week") {
+              const day = nowET.getDay();
+              const diff = (day === 0 ? -6 : 1) - day;
+              start = new Date(nowET);
+              start.setHours(0, 1, 0, 0);
+              start.setDate(start.getDate() + diff);
+              end = new Date(start);
+              end.setDate(start.getDate() + 7);
+            } else if (dateRange === "month") {
+              start = new Date(nowET.getFullYear(), nowET.getMonth(), 1, 0, 1);
+              end = new Date(nowET.getFullYear(), nowET.getMonth() + 1, 1, 0, 1);
+            } else if (dateRange === "year") {
+              start = new Date(nowET.getFullYear(), 0, 1, 0, 1);
+              end = new Date(nowET.getFullYear() + 1, 0, 1, 0, 1);
+            }
+            if (start && end) {
+              start = new Date(start.getTime() + tzDiff);
+              end = new Date(end.getTime() + tzDiff);
+              if (d < start || d >= end) return false;
             }
           }
           return true;
@@ -287,7 +301,7 @@
         const groups = {
           sector: Object.keys(sectorCounts),
           industry: Object.keys(industryCounts).sort(
-            (a, b) => industryCounts[b] - industryCounts[a],
+            (a, b) => industryCounts[b] - industryCounts[a]
           ),
           dealValue: [
             "0-20M",
@@ -355,6 +369,7 @@
           spacer.className = "w-full";
           container.appendChild(spacer);
         });
+        updateDatePills();
       }
 
       function updateStats() {
@@ -381,7 +396,8 @@
       }
 
       async function loadArticles() {
-        const res = await fetch("/articles/enriched-list?level=full");
+        // Use level=all to include partially enriched articles
+        const res = await fetch("/articles/enriched-list?level=all");
         const data = await res.json();
         allArticles = data.articles.map((a) => ({
           ...a,
