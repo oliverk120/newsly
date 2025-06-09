@@ -91,9 +91,9 @@ async function initDb() {
     about_acquiror TEXT,
     about_seller TEXT,
     about_target TEXT,
-    acquiror_hq TEXT,
-    seller_hq TEXT,
-    target_hq TEXT,
+    acquiror_url TEXT,
+    seller_url TEXT,
+    target_url TEXT,
     deal_value TEXT,
     currency TEXT,
     industry TEXT,
@@ -180,13 +180,13 @@ async function initDb() {
       'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'summarizeArticle',
-        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and list each party\'s headquarters location. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_hq":"...","target_hq":"...","seller_hq":"..."}. Text: "{text}"',
-        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq'
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and include each party\'s website URL if available. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_url":"...","target_url":"...","seller_url":"..."}. Text: "{text}"',
+        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,target_url,seller_url'
       ]
     );
   } else if (!sumRow.fields) {
     await configDb.run('UPDATE prompts SET fields = ? WHERE name = ?', [
-      'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq',
+      'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,target_url,seller_url',
       'summarizeArticle'
     ]);
   }
@@ -225,9 +225,9 @@ async function initDb() {
     'about_acquiror',
     'about_seller',
     'about_target',
-    'acquiror_hq',
-    'seller_hq',
-    'target_hq'
+    'acquiror_url',
+    'seller_url',
+    'target_url'
   ];
 
   for (const col of enrichmentColumns) {
