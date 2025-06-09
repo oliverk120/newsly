@@ -35,3 +35,26 @@ test('handles invalid OpenAI JSON', async () => {
   assert.equal(result.target, 'N/A');
   assert.equal(result.transactionType, 'Other');
 });
+
+test('supports custom fields list', async () => {
+  const mockOpenAI = {
+    chat: {
+      completions: {
+        create: async () => ({
+          choices: [{ message: { content: '{"acquiror":"Acme","deal_value":"$5M"}' } }]
+        })
+      }
+    }
+  };
+  const body = 'Acme Corp. today announced financing of $5M.';
+  const fields = ['acquiror', 'deal_value'];
+  const result = await extractParties(
+    mockOpenAI,
+    'Acme financing',
+    body,
+    undefined,
+    fields
+  );
+  assert.equal(result.acquiror, 'Acme');
+  assert.equal(result.dealValue, '$5M');
+});
