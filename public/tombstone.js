@@ -2,6 +2,16 @@ export function escapeHtml(str) {
   return str.replace(/[&<>]/g, t => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[t]));
 }
 
+export function escapeAttr(str) {
+  return str.replace(/[&<>"']/g, t => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[t]));
+}
+
 const countryFlags = {
   'canada': '🇨🇦',
   'united states': '🇺🇸',
@@ -35,6 +45,9 @@ export function createTombstone(article) {
   const acq = article.acquiror && article.acquiror !== 'N/A' ? escapeHtml(article.acquiror) : '';
   const seller = article.seller && article.seller !== 'N/A' ? escapeHtml(article.seller) : '';
   const target = article.target && article.target !== 'N/A' ? escapeHtml(article.target) : '';
+  const aboutAcq = article.about_acquiror || article.aboutAcquiror || '';
+  const aboutSeller = article.about_seller || article.aboutSeller || '';
+  const aboutTarget = article.about_target || article.aboutTarget || '';
   const txTypeRaw = article.transaction_type && article.transaction_type !== 'N/A'
     ? article.transaction_type.trim()
     : '';
@@ -44,24 +57,44 @@ export function createTombstone(article) {
 
   const bodyLines = [];
   if (txTypeRaw === 'M&A') {
-    if (acq) bodyLines.push(`<div class="font-bold text-center">${acq}</div>`);
+    if (acq) {
+      const title = aboutAcq ? ` title="${escapeAttr(aboutAcq)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${acq}</div>`);
+    }
     if (target || acq) bodyLines.push('<div class="text-center">acquired</div>');
-    if (target) bodyLines.push(`<div class="font-bold text-center">${target}</div>`);
+    if (target) {
+      const title = aboutTarget ? ` title="${escapeAttr(aboutTarget)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${target}</div>`);
+    }
     if (seller && seller !== target) {
       bodyLines.push('<div class="text-center">from</div>');
-      bodyLines.push(`<div class="font-bold text-center">${seller}</div>`);
+      const title = aboutSeller ? ` title="${escapeAttr(aboutSeller)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${seller}</div>`);
     }
   } else if (txTypeRaw === 'Financing') {
-    if (seller) bodyLines.push(`<div class="font-bold text-center">${seller}</div>`);
+    if (seller) {
+      const title = aboutSeller ? ` title="${escapeAttr(aboutSeller)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${seller}</div>`);
+    }
     bodyLines.push('<div class="text-center">raised financing</div>');
     if (acq) {
       bodyLines.push('<div class="text-center">from</div>');
-      bodyLines.push(`<div class="font-bold text-center">${acq}</div>`);
+      const title = aboutAcq ? ` title="${escapeAttr(aboutAcq)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${acq}</div>`);
     }
   } else {
-    if (acq) bodyLines.push(`<div class="font-bold text-center">${acq}</div>`);
-    if (target) bodyLines.push(`<div class="font-bold text-center">${target}</div>`);
-    if (seller && seller !== target) bodyLines.push(`<div class="font-bold text-center">${seller}</div>`);
+    if (acq) {
+      const title = aboutAcq ? ` title="${escapeAttr(aboutAcq)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${acq}</div>`);
+    }
+    if (target) {
+      const title = aboutTarget ? ` title="${escapeAttr(aboutTarget)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${target}</div>`);
+    }
+    if (seller && seller !== target) {
+      const title = aboutSeller ? ` title="${escapeAttr(aboutSeller)}"` : '';
+      bodyLines.push(`<div class="font-bold text-center"${title}>${seller}</div>`);
+    }
   }
 
   const header = `<div class="bg-gray-200 w-full text-center font-semibold text-xs">${txType || '&nbsp;'}</div>`;
