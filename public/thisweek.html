@@ -221,6 +221,7 @@
             a.valueBucket !== filters.dealValue
           )
             return false;
+
           if (dateRange && a.article_date && !isNaN(Date.parse(a.article_date))) {
             const d = new Date(a.article_date);
             const now = new Date();
@@ -246,8 +247,8 @@
               start = new Date(start.getTime() + tzDiff);
               end = new Date(end.getTime() + tzDiff);
               if (d < start || d >= end) return false;
+
             }
-          }
           return true;
         });
       }
