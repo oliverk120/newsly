@@ -32,7 +32,21 @@
 
     <div id="scrapeResults" class="mb-2 text-sm"></div>
     <div id="lastScrape" class="mb-2 text-sm"></div>
-    <pre id="scrapeLog" class="mb-4 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
+    <pre id="scrapeLog" class="mb-2 p-2 text-xs bg-gray-100 whitespace-pre-wrap"></pre>
+    <table id="progressTable" class="mb-4 table-auto w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th class="border px-2 py-1">Article</th>
+          <th class="border px-2 py-1">Body</th>
+          <th class="border px-2 py-1">Embed</th>
+          <th class="border px-2 py-1">Date</th>
+          <th class="border px-2 py-1">Location</th>
+          <th class="border px-2 py-1">Parties</th>
+          <th class="border px-2 py-1">Summary</th>
+        </tr>
+      </thead>
+      <tbody id="progressBody"></tbody>
+    </table>
 
     <p class="mb-4 text-sm">
       Manage sources and filters on the
@@ -75,6 +89,28 @@
       ];
 
       const enrichSteps = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
+
+      const progressRows = {};
+      const progressOrder = ['body', 'embedding', 'date', 'location', 'parties', 'summary'];
+      function resetProgress() {
+        const tbody = document.getElementById('progressBody');
+        tbody.innerHTML = '';
+        for (const k in progressRows) delete progressRows[k];
+      }
+      function updateProgress(id, step) {
+        if (!progressOrder.includes(step)) return;
+        let row = progressRows[id];
+        if (!row) {
+          const tbody = document.getElementById('progressBody');
+          row = document.createElement('tr');
+          row.innerHTML = `<td class="border px-2 py-1">${id}</td>` +
+            progressOrder.map(s => `<td data-step="${s}" class="border px-2 py-1 text-center"></td>`).join('');
+          tbody.appendChild(row);
+          progressRows[id] = row;
+        }
+        const cell = row.querySelector(`td[data-step="${step}"]`);
+        if (cell) cell.textContent = '✓';
+      }
 
       function formatTime(text) {
         if (!text) return '';
@@ -134,6 +170,7 @@
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
+        resetProgress();
         div.textContent = 'Running full pipeline...';
 
         const es = new EventSource('/scrape-enrich-stream');
@@ -141,6 +178,12 @@
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
+        es.addEventListener('step', e => {
+          try {
+            const data = JSON.parse(e.data);
+            updateProgress(data.id, data.step);
+          } catch {}
+        });
         es.addEventListener('done', e => {
           es.close();
           try {
@@ -159,6 +202,7 @@
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
+        resetProgress();
         div.textContent = 'Running pipeline...';
 
         const formData = new FormData(pipelineForm);
@@ -175,6 +219,12 @@
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
+        es.addEventListener('step', e => {
+          try {
+            const data = JSON.parse(e.data);
+            updateProgress(data.id, data.step);
+          } catch {}
+        });
         es.addEventListener('done', e => {
           es.close();
           try {
@@ -193,6 +243,7 @@
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
+        resetProgress();
         div.textContent = 'Running pipeline...';
 
         const formData = new FormData(pipelineForm);
@@ -210,6 +261,12 @@
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
+        es.addEventListener('step', e => {
+          try {
+            const data = JSON.parse(e.data);
+            updateProgress(data.id, data.step);
+          } catch {}
+        });
         es.addEventListener('done', e => {
           es.close();
           try {
