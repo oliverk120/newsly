@@ -528,6 +528,9 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     addLog(null, msg);
     res.write(`data: ${msg}\n\n`);
   };
+  const sendStep = (id, step) => {
+    res.write(`event: step\ndata: ${JSON.stringify({ id, step })}\n\n`);
+  };
 
   try {
     const sources = await configDb.all('SELECT * FROM sources');
@@ -589,7 +592,7 @@ app.get('/scrape-enrich-stream', async (req, res) => {
         return res.end();
       }
       try {
-        await processArticle(id);
+        await processArticle(id, undefined, [], sendStep);
         count++;
         enrichedTotal++;
         send(`Enriched ${count}/${totalToEnrich}`);

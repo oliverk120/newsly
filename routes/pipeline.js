@@ -71,6 +71,7 @@ router.get('/run-stream', async (req, res) => {
   res.flushHeaders();
 
   const send = msg => res.write(`data: ${msg}\n\n`);
+  const sendStep = (id, step) => res.write(`event: step\ndata: ${JSON.stringify({ id, step })}\n\n`);
 
   try {
     let steps = (req.query.steps || '')
@@ -110,7 +111,7 @@ router.get('/run-stream', async (req, res) => {
         if (!missing.length) continue;
       }
       try {
-        await processArticle(id, steps, logs);
+        await processArticle(id, steps, logs, sendStep);
         logs.forEach(send);
         logs.length = 0;
         processed++;
