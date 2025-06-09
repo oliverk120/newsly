@@ -211,9 +211,8 @@
             a.valueBucket !== filters.dealValue
           )
             return false;
-          if (filters.dateRange) {
+          if (filters.dateRange && a.article_date && !isNaN(Date.parse(a.article_date))) {
             const d = new Date(a.article_date);
-            if (isFinite(d)) {
               const now = new Date();
               let start, end;
               if (filters.dateRange === "week") {
@@ -381,7 +380,8 @@
       }
 
       async function loadArticles() {
-        const res = await fetch("/articles/enriched-list?level=full");
+        // Use level=all to include partially enriched articles
+        const res = await fetch("/articles/enriched-list?level=all");
         const data = await res.json();
         allArticles = data.articles.map((a) => ({
           ...a,
