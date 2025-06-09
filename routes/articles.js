@@ -117,7 +117,7 @@ router.get('/enrich-list', async (req, res) => {
   const query = `
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date,
+           ae.deal_value, ae.currency, ae.location, ae.article_date,
            ae.transaction_type, ae.embedding, ae.log,
            ae.summary, ae.sector, ae.industry
     FROM articles a
@@ -170,7 +170,7 @@ router.get('/enriched-list', async (req, res) => {
     `SELECT a.id, a.title, a.description, a.time, a.link,
             ${agg} as filter_ids,
             ae.body, ae.acquiror, ae.seller, ae.target,
-            ae.deal_value, ae.location, ae.article_date,
+            ae.deal_value, ae.currency, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
        FROM articles a
@@ -179,7 +179,7 @@ router.get('/enriched-list', async (req, res) => {
       ${includeAll ? '' : 'WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL'}
       GROUP BY a.id, a.title, a.description, a.time, a.link,
                ae.body, ae.acquiror, ae.seller, ae.target,
-               ae.deal_value, ae.location, ae.article_date,
+               ae.deal_value, ae.currency, ae.location, ae.article_date,
                ae.transaction_type, ae.log,
                ae.summary, ae.sector, ae.industry
       ORDER BY a.time DESC`
@@ -295,10 +295,10 @@ router.post('/:id/extract-value-location', async (req, res) => {
   try {
     await processArticle(id, ['value']);
     const row = await db.get(
-      'SELECT deal_value, location FROM article_enrichments WHERE article_id = ?',
+      'SELECT deal_value, currency, location FROM article_enrichments WHERE article_id = ?',
       [id]
     );
-    res.json({ success: true, dealValue: row.deal_value, location: row.location });
+    res.json({ success: true, dealValue: row.deal_value, currency: row.currency, location: row.location });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to extract value/location' });

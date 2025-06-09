@@ -200,6 +200,40 @@
             } else if (data.error) {
               results.textContent = `Error: ${data.error}`;
             }
+          log.textContent = JSON.stringify(data, null, 2);
+        });
+      });
+
+        document.querySelectorAll('.valueBtn').forEach(btn => {
+          btn.addEventListener('click', async e => {
+            const id = e.target.getAttribute('data-id');
+            const log = document.getElementById('actionLog');
+            const results = document.getElementById('actionResults');
+            log.textContent = '';
+            results.textContent = '';
+            console.log('Extracting value', id);
+
+            let data;
+            try {
+              const resp = await fetch(`/articles/${id}/extract-value-location`, { method: 'POST' });
+              data = await resp.json();
+            } catch (err) {
+              console.error('Value request failed', err);
+              results.textContent = 'Request failed';
+              return;
+            }
+
+            console.log('Value response', data);
+            if (data.dealValue !== undefined) {
+              const row = e.target.closest('tr');
+              row.querySelector('.location-cell').textContent = data.location;
+              if (data.completed) {
+                row.querySelector('.completed-cell').textContent = data.completed;
+              }
+              results.textContent = `Extracted value for article ${id}`;
+            } else if (data.error) {
+              results.textContent = `Error: ${data.error}`;
+            }
             log.textContent = JSON.stringify(data, null, 2);
           });
         });
@@ -414,7 +448,7 @@
               `<button data-id="${a.id}" class="enrichBtn bg-blue-500 text-white px-2 py-1 rounded">${btnLabel}</button>` +
               `<button data-id="${a.id}" class="extractBtn bg-purple-500 text-white px-2 py-1 rounded">Extract Parties &amp; Type</button>` +
               `<button data-id="${a.id}" class="summarizeBtn bg-orange-500 text-white px-2 py-1 rounded">Summarize</button>` +
-              `<button disabled class="${disabledCls} px-2 py-1 rounded">Deal Value</button>` +
+              `<button data-id="${a.id}" class="valueBtn bg-green-500 text-white px-2 py-1 rounded">Deal Value</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Target Info</button>` +
               `<button disabled class="${disabledCls} px-2 py-1 rounded">Acquirer Info</button>` +
             `</td>` +
