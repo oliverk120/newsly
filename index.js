@@ -95,6 +95,12 @@ async function initDb() {
     acquiror TEXT,
     seller TEXT,
     target TEXT,
+    about_acquiror TEXT,
+    about_seller TEXT,
+    about_target TEXT,
+    acquiror_hq TEXT,
+    seller_hq TEXT,
+    target_hq TEXT,
     deal_value TEXT,
     currency TEXT,
     industry TEXT,
@@ -174,14 +180,14 @@ async function initDb() {
       'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'summarizeArticle',
-        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Respond with JSON {"summary":"...","sector":"...","industry":"..."}. Text: "{text}"',
-        'summary,sector,industry'
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and list each party\'s headquarters location. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_hq":"...","target_hq":"...","seller_hq":"..."}. Text: "{text}"',
+        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq'
       ]
     );
   } else if (!sumRow.fields) {
     await configDb.run(
       'UPDATE prompts SET fields = ? WHERE name = ?',
-      ['summary,sector,industry', 'summarizeArticle']
+      ['summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq', 'summarizeArticle']
     );
   }
 
@@ -244,6 +250,30 @@ async function initDb() {
   const hasCurrency = await hasColumn(db, 'article_enrichments', 'currency');
   if (!hasCurrency) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN currency TEXT');
+  }
+  const hasAboutAcq = await hasColumn(db, 'article_enrichments', 'about_acquiror');
+  if (!hasAboutAcq) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_acquiror TEXT');
+  }
+  const hasAboutSeller = await hasColumn(db, 'article_enrichments', 'about_seller');
+  if (!hasAboutSeller) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_seller TEXT');
+  }
+  const hasAboutTarget = await hasColumn(db, 'article_enrichments', 'about_target');
+  if (!hasAboutTarget) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_target TEXT');
+  }
+  const hasAcqHq = await hasColumn(db, 'article_enrichments', 'acquiror_hq');
+  if (!hasAcqHq) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN acquiror_hq TEXT');
+  }
+  const hasSellerHq = await hasColumn(db, 'article_enrichments', 'seller_hq');
+  if (!hasSellerHq) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN seller_hq TEXT');
+  }
+  const hasTargetHq = await hasColumn(db, 'article_enrichments', 'target_hq');
+  if (!hasTargetHq) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN target_hq TEXT');
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (
