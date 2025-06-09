@@ -117,6 +117,8 @@ router.get('/enrich-list', async (req, res) => {
   const query = `
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
+           ae.about_acquiror, ae.about_seller, ae.about_target,
+           ae.acquiror_hq, ae.seller_hq, ae.target_hq,
            ae.deal_value, ae.currency, ae.location, ae.article_date,
            ae.transaction_type, ae.embedding, ae.log,
            ae.summary, ae.sector, ae.industry
@@ -170,6 +172,8 @@ router.get('/enriched-list', async (req, res) => {
     `SELECT a.id, a.title, a.description, a.time, a.link,
             ${agg} as filter_ids,
             ae.body, ae.acquiror, ae.seller, ae.target,
+            ae.about_acquiror, ae.about_seller, ae.about_target,
+            ae.acquiror_hq, ae.seller_hq, ae.target_hq,
             ae.deal_value, ae.currency, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
@@ -179,6 +183,8 @@ router.get('/enriched-list', async (req, res) => {
       ${includeAll ? '' : 'WHERE ae.body IS NOT NULL AND ae.embedding IS NOT NULL'}
       GROUP BY a.id, a.title, a.description, a.time, a.link,
                ae.body, ae.acquiror, ae.seller, ae.target,
+               ae.about_acquiror, ae.about_seller, ae.about_target,
+               ae.acquiror_hq, ae.seller_hq, ae.target_hq,
                ae.deal_value, ae.currency, ae.location, ae.article_date,
                ae.transaction_type, ae.log,
                ae.summary, ae.sector, ae.industry
@@ -279,10 +285,24 @@ router.post('/:id/summarize', async (req, res) => {
   try {
     await processArticle(id, ['summary']);
     const row = await db.get(
-      'SELECT summary, sector, industry FROM article_enrichments WHERE article_id = ?',
+      `SELECT summary, sector, industry,
+              about_acquiror, about_seller, about_target,
+              acquiror_hq, seller_hq, target_hq
+         FROM article_enrichments WHERE article_id = ?`,
       [id]
     );
-    res.json({ success: true, summary: row.summary, sector: row.sector, industry: row.industry });
+    res.json({
+      success: true,
+      summary: row.summary,
+      sector: row.sector,
+      industry: row.industry,
+      aboutAcquiror: row.about_acquiror,
+      aboutSeller: row.about_seller,
+      aboutTarget: row.about_target,
+      acquirorHq: row.acquiror_hq,
+      sellerHq: row.seller_hq,
+      targetHq: row.target_hq
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to summarize article' });
