@@ -63,6 +63,19 @@ async function initDb() {
     created_at ${configDateTime} DEFAULT CURRENT_TIMESTAMP
   )`);
 
+  const frow = await configDb.get('SELECT COUNT(*) as count FROM filters');
+  if (frow.count === 0) {
+    await configDb.run(
+      'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
+      [
+        'M&A',
+        'keyword',
+        'acquir*, acquisition, sell, purchas*, merg*, sale',
+        1
+      ]
+    );
+  }
+
   await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
     id ${idColumn},
     article_id INTEGER,
