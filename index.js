@@ -63,17 +63,24 @@ async function initDb() {
     created_at ${configDateTime} DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  const frow = await configDb.get('SELECT COUNT(*) as count FROM filters');
-  if (frow.count === 0) {
-    await configDb.run(
-      'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)',
-      [
-        'M&A',
-        'keyword',
-        'acquir*, acquisition, sell, purchas*, merg*, sale',
-        1
-      ]
-    );
+
+  const existing = await configDb.get(
+    'SELECT id FROM filters WHERE name = ? LIMIT 1',
+    ['M&A']
+  );
+  if (!existing) {
+    const insertSql = configIsPg
+      ?
+        'INSERT INTO filters (name, type, value, active) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING'
+      :
+        'INSERT OR IGNORE INTO filters (name, type, value, active) VALUES (?, ?, ?, ?)';
+    await configDb.run(insertSql, [
+      'M&A',
+      'keyword',
+      'acquir*, acquisition, sell, purchas*, merg*, sale',
+      1
+    ]);
+
   }
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
