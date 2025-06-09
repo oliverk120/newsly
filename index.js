@@ -135,48 +135,72 @@ async function initDb() {
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS prompts (
     name TEXT PRIMARY KEY,
-    template TEXT
+    template TEXT,
+    fields TEXT
   )`);
 
+  const hasPromptFields = await hasColumn(configDb, 'prompts', 'fields');
+  if (!hasPromptFields) {
+    await configDb.run('ALTER TABLE prompts ADD COLUMN fields TEXT');
+  }
+
   const promptRow = await configDb.get(
-    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    'SELECT template, fields FROM prompts WHERE name = ?',
     ['extractParties']
   );
-  if (promptRow.count === 0) {
+  if (!promptRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'extractParties',
-        'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Anything relating to one party buying, acquiring another is considered "M&A". The target and seller are often the same in an M&A transaction, but the target may also be select assets or a division of the seller. In a financing, the company issuing the financing is the seller. If none are mentioned, respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}.  Text: "{text}"'
+        'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Anything relating to one party buying, acquiring another is considered "M&A". The target and seller are often the same in an M&A transaction, but the target may also be select assets or a division of the seller. In a financing, the company issuing the financing is the seller. If none are mentioned, respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}.  Text: "{text}"',
+        'acquiror,seller,target,transaction_type'
       ]
+    );
+  } else if (!promptRow.fields) {
+    await configDb.run(
+      'UPDATE prompts SET fields = ? WHERE name = ?',
+      ['acquiror,seller,target,transaction_type', 'extractParties']
     );
   }
 
   const sumRow = await configDb.get(
-    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    'SELECT template, fields FROM prompts WHERE name = ?',
     ['summarizeArticle']
   );
-  if (sumRow.count === 0) {
+  if (!sumRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'summarizeArticle',
-        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Respond with JSON {"summary":"...","sector":"...","industry":"..."}. Text: "{text}"'
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Respond with JSON {"summary":"...","sector":"...","industry":"..."}. Text: "{text}"',
+        'summary,sector,industry'
       ]
+    );
+  } else if (!sumRow.fields) {
+    await configDb.run(
+      'UPDATE prompts SET fields = ? WHERE name = ?',
+      ['summary,sector,industry', 'summarizeArticle']
     );
   }
 
   const valRow = await configDb.get(
-    'SELECT COUNT(*) as count FROM prompts WHERE name = ?',
+    'SELECT template, fields FROM prompts WHERE name = ?',
     ['extractValueLocation']
   );
-  if (valRow.count === 0) {
+  if (!valRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template) VALUES (?, ?)',
+      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'extractValueLocation',
-        'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","location":"..."}. Text: "{text}"'
+        'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","location":"..."}. Text: "{text}"',
+        'deal_value,location'
       ]
+    );
+  } else if (!valRow.fields) {
+    await configDb.run(
+      'UPDATE prompts SET fields = ? WHERE name = ?',
+      ['deal_value,location', 'extractValueLocation']
     );
   }
 
