@@ -41,10 +41,28 @@ function flagFromLocation(location) {
   return countryFlags[country] || '';
 }
 
+function formatParty(name, url) {
+  const text = name && name !== 'N/A' ? escapeHtml(name) : '';
+  if (!text) return '';
+  const validUrl = url && /^https?:\/\//i.test(url);
+  return validUrl
+    ? `<a class="text-blue-600 underline" href="${escapeAttr(url)}" target="_blank">${text}</a>`
+    : text;
+}
+
 export function createTombstone(article) {
-  const acq = article.acquiror && article.acquiror !== 'N/A' ? escapeHtml(article.acquiror) : '';
-  const seller = article.seller && article.seller !== 'N/A' ? escapeHtml(article.seller) : '';
-  const target = article.target && article.target !== 'N/A' ? escapeHtml(article.target) : '';
+  const acq = formatParty(
+    article.acquiror,
+    article.acquiror_url || article.acquirorUrl
+  );
+  const seller = formatParty(
+    article.seller,
+    article.seller_url || article.sellerUrl
+  );
+  const target = formatParty(
+    article.target,
+    article.target_url || article.targetUrl
+  );
   const aboutAcq = article.about_acquiror || article.aboutAcquiror || '';
   const aboutSeller = article.about_seller || article.aboutSeller || '';
   const aboutTarget = article.about_target || article.aboutTarget || '';
