@@ -6,8 +6,13 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const rows = await configDb.all('SELECT name, template FROM prompts');
-    res.json(rows);
+    const rows = await configDb.all('SELECT name, template, fields FROM prompts');
+    const mapped = rows.map(r => ({
+      name: r.name,
+      template: r.template,
+      fields: r.fields ? r.fields.split(',').map(f => f.trim()).filter(Boolean) : []
+    }));
+    res.json(mapped);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to retrieve prompts' });
@@ -17,9 +22,9 @@ router.get('/', async (req, res) => {
 router.get('/:name', async (req, res) => {
   const { name } = req.params;
   try {
-    const template = await getPrompt(configDb, name);
-    if (!template) return res.status(404).json({ error: 'Prompt not found' });
-    res.json({ name, template });
+    const prompt = await getPrompt(configDb, name);
+    if (!prompt) return res.status(404).json({ error: 'Prompt not found' });
+    res.json({ name, template: prompt.template, fields: prompt.fields });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to retrieve prompt' });
@@ -28,9 +33,9 @@ router.get('/:name', async (req, res) => {
 
 router.put('/:name', async (req, res) => {
   const { name } = req.params;
-  const { template } = req.body;
+  const { template, fields = [] } = req.body;
   try {
-    const changes = await setPrompt(configDb, name, template);
+    const changes = await setPrompt(configDb, name, template, fields);
     res.json({ updated: changes });
   } catch (err) {
     console.error(err);
