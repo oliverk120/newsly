@@ -264,7 +264,8 @@ async function initDb() {
   }
 
   const row = await configDb.get('SELECT COUNT(*) as count FROM sources');
-  if (row.count === 0) {
+  const sourceCount = row ? parseInt(row.count, 10) : 0;
+  if (sourceCount === 0) {
     const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
          time_selector, link_selector, image_selector, body_selector,
