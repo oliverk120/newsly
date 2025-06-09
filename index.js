@@ -96,6 +96,7 @@ async function initDb() {
     seller TEXT,
     target TEXT,
     deal_value TEXT,
+    currency TEXT,
     industry TEXT,
     extra TEXT,
     article_date TEXT,
@@ -193,14 +194,14 @@ async function initDb() {
       'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'extractValueLocation',
-        'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","location":"..."}. Text: "{text}"',
-        'deal_value,location'
+        'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","currency":"...","location":"..."}. Text: "{text}"',
+        'deal_value,currency,location'
       ]
     );
   } else if (!valRow.fields) {
     await configDb.run(
       'UPDATE prompts SET fields = ? WHERE name = ?',
-      ['deal_value,location', 'extractValueLocation']
+      ['deal_value,currency,location', 'extractValueLocation']
     );
   }
 
@@ -239,6 +240,10 @@ async function initDb() {
   const hasSector = await hasColumn(db, 'article_enrichments', 'sector');
   if (!hasSector) {
     await db.run('ALTER TABLE article_enrichments ADD COLUMN sector TEXT');
+  }
+  const hasCurrency = await hasColumn(db, 'article_enrichments', 'currency');
+  if (!hasCurrency) {
+    await db.run('ALTER TABLE article_enrichments ADD COLUMN currency TEXT');
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (

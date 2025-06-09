@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const extractValueAndLocation = require('../../lib/enrichment/extractValueAndLocation');
 
 function createArticleDb(initialLocation = 'Paris') {
-  const store = { location: initialLocation, steps: [] };
+  const store = { location: initialLocation, currency: '', steps: [] };
   return {
     get: async (sql, params) => {
       if (sql.includes('body, location')) {
@@ -27,7 +27,8 @@ function createArticleDb(initialLocation = 'Paris') {
     run: async (sql, params) => {
       if (sql.startsWith('INSERT INTO article_enrichments')) {
         store.dealValue = params[1];
-        store.location = params[2];
+        store.currency = params[2];
+        store.location = params[3];
       } else if (sql.startsWith('INSERT INTO article_enrichment_steps')) {
         const step = params[1];
         if (!store.steps.includes(step)) store.steps.push(step);
@@ -47,7 +48,7 @@ test('extracts deal value and updates location', async () => {
     chat: {
       completions: {
         create: async () => ({
-          choices: [{ message: { content: '{"dealValue":"$100m","location":"Paris, France"}' } }]
+          choices: [{ message: { content: '{"dealValue":"$100m","currency":"USD","location":"Paris, France"}' } }]
         })
       }
     }
@@ -55,6 +56,7 @@ test('extracts deal value and updates location', async () => {
   const db = createArticleDb();
   const result = await extractValueAndLocation(db, mockConfigDb, mockOpenAI, 1);
   assert.equal(result.dealValue, '$100m');
+  assert.equal(result.currency, 'USD');
   assert.equal(result.location, 'Paris, France');
 });
 
@@ -65,5 +67,6 @@ test('handles invalid JSON output', async () => {
   const db = createArticleDb('Toronto');
   const result = await extractValueAndLocation(db, mockConfigDb, mockOpenAI, 2);
   assert.equal(result.dealValue, 'undisclosed');
+  assert.equal(result.currency, '');
   assert.equal(result.location, 'Toronto');
 });

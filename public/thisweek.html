@@ -257,7 +257,7 @@
             `<td class="border px-2 py-1">${sectorHtml}</td>` +
             `<td class="border px-2 py-1">${a.location || ""}</td>` +
             `<td class="border px-2 py-1">${a.deal_value || ""}</td>` +
-            `<td class="border px-2 py-1">${extractCurrency(a.deal_value)}</td>`;
+            `<td class="border px-2 py-1">${a.currency || extractCurrency(a.deal_value)}</td>`;
           tbody.appendChild(tr);
         });
       }
