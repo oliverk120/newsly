@@ -1,45 +1,45 @@
-const express = require('express');
-const path = require('path');
-const db = require('./db');
-const configDb = require('./configDb');
-const { runFilters } = require('./lib/filters');
-const { scrapeSource } = require('./lib/scraper');
-const { OpenAI } = require('openai');
-const createPipeline = require('./lib/enrichment/pipeline');
-const insertArticles = require('./lib/insertArticles');
-const addLog = require('./lib/addLog');
-const logger = require('./logger');
-
-
+const express = require("express");
+const path = require("path");
+const db = require("./db");
+const configDb = require("./configDb");
+const { runFilters } = require("./lib/filters");
+const { scrapeSource } = require("./lib/scraper");
+const { OpenAI } = require("openai");
+const createPipeline = require("./lib/enrichment/pipeline");
+const insertArticles = require("./lib/insertArticles");
+const addLog = require("./lib/addLog");
+const logger = require("./logger");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const processArticle = createPipeline(db, configDb, openai);
 
-const isPg = db.raw?.getDialect() === 'postgres';
-const configIsPg = configDb.raw?.getDialect() === 'postgres';
-const idColumn = isPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
-const configIdColumn = configIsPg ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY';
-const dateTime = isPg ? 'TIMESTAMP' : 'DATETIME';
-const configDateTime = configIsPg ? 'TIMESTAMP' : 'DATETIME';
+const isPg = db.raw?.getDialect() === "postgres";
+const configIsPg = configDb.raw?.getDialect() === "postgres";
+const idColumn = isPg ? "SERIAL PRIMARY KEY" : "INTEGER PRIMARY KEY";
+const configIdColumn = configIsPg
+  ? "SERIAL PRIMARY KEY"
+  : "INTEGER PRIMARY KEY";
+const dateTime = isPg ? "TIMESTAMP" : "DATETIME";
+const configDateTime = configIsPg ? "TIMESTAMP" : "DATETIME";
 
 async function hasColumn(database, table, column) {
-  if (database.raw?.getDialect() === 'postgres') {
+  if (database.raw?.getDialect() === "postgres") {
     const row = await database.get(
       `SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
-      [table, column]
+      [table, column],
     );
     return !!row;
   }
   const info = await database.all(`PRAGMA table_info(${table})`);
-  return info.some(r => r.name === column);
+  return info.some((r) => r.name === column);
 }
 
 let stopPipeline = false;
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 // Initialize SQLite database
@@ -63,6 +63,7 @@ async function initDb() {
     created_at ${configDateTime} DEFAULT CURRENT_TIMESTAMP
   )`);
 
+
   const existing = await configDb.get(
     'SELECT id FROM filters WHERE name = ? LIMIT 1',
     ['M&A']
@@ -79,6 +80,7 @@ async function initDb() {
       'acquir*, acquisition, sell, purchas*, merg*, sale',
       1
     ]);
+
   }
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_filter_matches (
@@ -103,7 +105,7 @@ async function initDb() {
   await db.run(dedupeSql);
 
   await db.run(
-    'CREATE UNIQUE INDEX IF NOT EXISTS idx_article_filter_unique ON article_filter_matches(article_id, filter_id)'
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_article_filter_unique ON article_filter_matches(article_id, filter_id)",
   );
 
   await db.run(`CREATE TABLE IF NOT EXISTS article_enrichments (
@@ -140,19 +142,26 @@ async function initDb() {
     FOREIGN KEY(article_id) REFERENCES articles(id)
   )`);
 
-  const stepCountRow = await db.get('SELECT COUNT(*) as count FROM article_enrichment_steps');
+  const stepCountRow = await db.get(
+    "SELECT COUNT(*) as count FROM article_enrichment_steps",
+  );
   if (stepCountRow.count === 0) {
-    const rows = await db.all('SELECT article_id, completed, embedding FROM article_enrichments');
+    const rows = await db.all(
+      "SELECT article_id, completed, embedding FROM article_enrichments",
+    );
     for (const r of rows) {
       let steps = [];
       if (r.completed) {
-        steps = r.completed.split(',').map(s => s.trim()).filter(Boolean);
+        steps = r.completed
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
       }
-      if (r.embedding && !steps.includes('embedding')) steps.push('embedding');
+      if (r.embedding && !steps.includes("embedding")) steps.push("embedding");
       for (const s of steps) {
         const sql = isPg
-          ? 'INSERT INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?) ON CONFLICT DO NOTHING'
-          : 'INSERT OR IGNORE INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?)';
+          ? "INSERT INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?) ON CONFLICT DO NOTHING"
+          : "INSERT OR IGNORE INTO article_enrichment_steps (article_id, step_name) VALUES (?, ?)";
         await db.run(sql, [r.article_id, s]);
       }
     }
@@ -164,134 +173,156 @@ async function initDb() {
     fields TEXT
   )`);
 
-  const hasPromptFields = await hasColumn(configDb, 'prompts', 'fields');
+  const hasPromptFields = await hasColumn(configDb, "prompts", "fields");
   if (!hasPromptFields) {
-    await configDb.run('ALTER TABLE prompts ADD COLUMN fields TEXT');
+    await configDb.run("ALTER TABLE prompts ADD COLUMN fields TEXT");
   }
 
   const promptRow = await configDb.get(
-    'SELECT template, fields FROM prompts WHERE name = ?',
-    ['extractParties']
+    "SELECT template, fields FROM prompts WHERE name = ?",
+    ["extractParties"],
   );
   if (!promptRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
+      "INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)",
       [
-        'extractParties',
+        "extractParties",
         'Extract the acquiror, seller, target and the transaction type ("M&A", "Financing" or "Other"). Anything relating to one party buying, acquiring another is considered "M&A". The target and seller are often the same in an M&A transaction, but the target may also be select assets or a division of the seller. In a financing, the company issuing the financing is the seller. If none are mentioned, respond with JSON {"acquiror":"N/A","seller":"N/A","target":"N/A","transactionType":"Other"}.  Text: "{text}"',
-        'acquiror,seller,target,transaction_type'
-      ]
+        "acquiror,seller,target,transaction_type",
+      ],
     );
   } else if (!promptRow.fields) {
-    await configDb.run(
-      'UPDATE prompts SET fields = ? WHERE name = ?',
-      ['acquiror,seller,target,transaction_type', 'extractParties']
-    );
+    await configDb.run("UPDATE prompts SET fields = ? WHERE name = ?", [
+      "acquiror,seller,target,transaction_type",
+      "extractParties",
+    ]);
   }
 
   const sumRow = await configDb.get(
-    'SELECT template, fields FROM prompts WHERE name = ?',
-    ['summarizeArticle']
+    "SELECT template, fields FROM prompts WHERE name = ?",
+    ["summarizeArticle"],
   );
   if (!sumRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
+      "INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)",
       [
-        'summarizeArticle',
+        "summarizeArticle",
         'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and list each party\'s headquarters location. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_hq":"...","target_hq":"...","seller_hq":"..."}. Text: "{text}"',
-        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq'
-      ]
+        "summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq",
+      ],
     );
   } else if (!sumRow.fields) {
-    await configDb.run(
-      'UPDATE prompts SET fields = ? WHERE name = ?',
-      ['summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq', 'summarizeArticle']
-    );
+    await configDb.run("UPDATE prompts SET fields = ? WHERE name = ?", [
+      "summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_hq,target_hq,seller_hq",
+      "summarizeArticle",
+    ]);
   }
 
   const valRow = await configDb.get(
-    'SELECT template, fields FROM prompts WHERE name = ?',
-    ['extractValueLocation']
+    "SELECT template, fields FROM prompts WHERE name = ?",
+    ["extractValueLocation"],
   );
   if (!valRow) {
     await configDb.run(
-      'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
+      "INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)",
       [
-        'extractValueLocation',
+        "extractValueLocation",
         'Extract the transaction value in US dollars from the article text if mentioned. If none is present respond with "undisclosed". Review the provided location "{location}" and return a more complete location including country if possible. Respond with JSON {"dealValue":"...","currency":"...","location":"..."}. Text: "{text}"',
-        'deal_value,currency,location'
-      ]
+        "deal_value,currency,location",
+      ],
     );
   } else if (!valRow.fields) {
-    await configDb.run(
-      'UPDATE prompts SET fields = ? WHERE name = ?',
-      ['deal_value,currency,location', 'extractValueLocation']
-    );
+    await configDb.run("UPDATE prompts SET fields = ? WHERE name = ?", [
+      "deal_value,currency,location",
+      "extractValueLocation",
+    ]);
   }
 
-  const hasBody = await hasColumn(db, 'article_enrichments', 'body');
+  const hasBody = await hasColumn(db, "article_enrichments", "body");
   if (!hasBody) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN body TEXT");
   }
-  const hasSeller = await hasColumn(db, 'article_enrichments', 'seller');
+  const hasSeller = await hasColumn(db, "article_enrichments", "seller");
   if (!hasSeller) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN seller TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN seller TEXT");
   }
-  const hasCompleted = await hasColumn(db, 'article_enrichments', 'completed');
+  const hasCompleted = await hasColumn(db, "article_enrichments", "completed");
   if (!hasCompleted) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN completed TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN completed TEXT");
   }
-  const hasDate = await hasColumn(db, 'article_enrichments', 'article_date');
+  const hasDate = await hasColumn(db, "article_enrichments", "article_date");
   if (!hasDate) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN article_date TEXT');
+    await db.run(
+      "ALTER TABLE article_enrichments ADD COLUMN article_date TEXT",
+    );
   }
-  const hasLocation = await hasColumn(db, 'article_enrichments', 'location');
+  const hasLocation = await hasColumn(db, "article_enrichments", "location");
   if (!hasLocation) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN location TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN location TEXT");
   }
-  const hasTx = await hasColumn(db, 'article_enrichments', 'transaction_type');
+  const hasTx = await hasColumn(db, "article_enrichments", "transaction_type");
   if (!hasTx) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT');
+    await db.run(
+      "ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT",
+    );
   }
-  const hasLog = await hasColumn(db, 'article_enrichments', 'log');
+  const hasLog = await hasColumn(db, "article_enrichments", "log");
   if (!hasLog) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN log TEXT");
   }
-  const hasSummary = await hasColumn(db, 'article_enrichments', 'summary');
+  const hasSummary = await hasColumn(db, "article_enrichments", "summary");
   if (!hasSummary) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN summary TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN summary TEXT");
   }
-  const hasSector = await hasColumn(db, 'article_enrichments', 'sector');
+  const hasSector = await hasColumn(db, "article_enrichments", "sector");
   if (!hasSector) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN sector TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN sector TEXT");
   }
-  const hasCurrency = await hasColumn(db, 'article_enrichments', 'currency');
+  const hasCurrency = await hasColumn(db, "article_enrichments", "currency");
   if (!hasCurrency) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN currency TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN currency TEXT");
   }
-  const hasAboutAcq = await hasColumn(db, 'article_enrichments', 'about_acquiror');
+  const hasAboutAcq = await hasColumn(
+    db,
+    "article_enrichments",
+    "about_acquiror",
+  );
   if (!hasAboutAcq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_acquiror TEXT');
+    await db.run(
+      "ALTER TABLE article_enrichments ADD COLUMN about_acquiror TEXT",
+    );
   }
-  const hasAboutSeller = await hasColumn(db, 'article_enrichments', 'about_seller');
+  const hasAboutSeller = await hasColumn(
+    db,
+    "article_enrichments",
+    "about_seller",
+  );
   if (!hasAboutSeller) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_seller TEXT');
+    await db.run(
+      "ALTER TABLE article_enrichments ADD COLUMN about_seller TEXT",
+    );
   }
-  const hasAboutTarget = await hasColumn(db, 'article_enrichments', 'about_target');
+  const hasAboutTarget = await hasColumn(
+    db,
+    "article_enrichments",
+    "about_target",
+  );
   if (!hasAboutTarget) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_target TEXT');
+    await db.run(
+      "ALTER TABLE article_enrichments ADD COLUMN about_target TEXT",
+    );
   }
-  const hasAcqHq = await hasColumn(db, 'article_enrichments', 'acquiror_hq');
+  const hasAcqHq = await hasColumn(db, "article_enrichments", "acquiror_hq");
   if (!hasAcqHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN acquiror_hq TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN acquiror_hq TEXT");
   }
-  const hasSellerHq = await hasColumn(db, 'article_enrichments', 'seller_hq');
+  const hasSellerHq = await hasColumn(db, "article_enrichments", "seller_hq");
   if (!hasSellerHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN seller_hq TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN seller_hq TEXT");
   }
-  const hasTargetHq = await hasColumn(db, 'article_enrichments', 'target_hq');
+  const hasTargetHq = await hasColumn(db, "article_enrichments", "target_hq");
   if (!hasTargetHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN target_hq TEXT');
+    await db.run("ALTER TABLE article_enrichments ADD COLUMN target_hq TEXT");
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (
@@ -308,20 +339,24 @@ async function initDb() {
     date_selector TEXT
   )`);
 
-  const hasBodySel = await hasColumn(configDb, 'sources', 'body_selector');
+  const hasBodySel = await hasColumn(configDb, "sources", "body_selector");
   if (!hasBodySel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
+    await configDb.run("ALTER TABLE sources ADD COLUMN body_selector TEXT");
   }
-  const hasLocationSel = await hasColumn(configDb, 'sources', 'location_selector');
+  const hasLocationSel = await hasColumn(
+    configDb,
+    "sources",
+    "location_selector",
+  );
   if (!hasLocationSel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
+    await configDb.run("ALTER TABLE sources ADD COLUMN location_selector TEXT");
   }
-  const hasDateSel = await hasColumn(configDb, 'sources', 'date_selector');
+  const hasDateSel = await hasColumn(configDb, "sources", "date_selector");
   if (!hasDateSel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
+    await configDb.run("ALTER TABLE sources ADD COLUMN date_selector TEXT");
   }
 
-  const row = await configDb.get('SELECT COUNT(*) as count FROM sources');
+  const row = await configDb.get("SELECT COUNT(*) as count FROM sources");
   if (row.count === 0) {
     const insert = `INSERT INTO sources
         (base_url, article_selector, title_selector, description_selector,
@@ -329,16 +364,16 @@ async function initDb() {
          location_selector, date_selector)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     await configDb.run(insert, [
-      'https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100',
-      'div.col-sm-12.card',
-      'h3',
-      'p',
-      'h3 small',
-      'a.newsreleaseconsolidatelink',
+      "https://www.newswire.ca/news-releases/financial-services-latest-news/acquisitions-mergers-and-takeovers-list/?page=1&pagesize=100",
+      "div.card",
+      "h3",
+      "p",
+      "h3 small",
+      "a.newsreleaseconsolidatelink",
       null,
-      '#release-body',
-      'span.xn-location',
-      'span.xn-chron'
+      "#release-body",
+      "span.xn-location",
+      "span.xn-chron",
     ]);
   }
 }
@@ -347,17 +382,17 @@ async function startServer() {
   try {
     await initDb();
   } catch (err) {
-    logger.error('Failed to init db', err);
+    logger.error("Failed to init db", err);
     process.exit(1);
   }
 
-  app.use('/articles', require('./routes/articles'));
-  app.use('/sources', require('./routes/sources'));
-  app.use('/filters', require('./routes/filters'));
-  app.use('/prompts', require('./routes/prompts'));
-  app.use('/pipeline', require('./routes/pipeline'));
+  app.use("/articles", require("./routes/articles"));
+  app.use("/sources", require("./routes/sources"));
+  app.use("/filters", require("./routes/filters"));
+  app.use("/prompts", require("./routes/prompts"));
+  app.use("/pipeline", require("./routes/pipeline"));
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT}`);
   });
 
@@ -368,14 +403,12 @@ async function startServer() {
 
 startServer();
 
-
-
 // Endpoint to get article statistics
-app.get('/stats', async (req, res) => {
+app.get("/stats", async (req, res) => {
   try {
-    const rows = await db.all('SELECT link FROM articles');
+    const rows = await db.all("SELECT link FROM articles");
     const bySource = {};
-    rows.forEach(r => {
+    rows.forEach((r) => {
       try {
         const origin = new URL(r.link).origin;
         bySource[origin] = (bySource[origin] || 0) + 1;
@@ -383,28 +416,26 @@ app.get('/stats', async (req, res) => {
     });
 
     const row = await db.get(
-      'SELECT COUNT(*) as total, MAX(created_at) as latestScrape, MIN(created_at) as earliestScrape, MIN(time) as earliestArticle FROM articles'
+      "SELECT COUNT(*) as total, MAX(created_at) as latestScrape, MIN(created_at) as earliestScrape, MIN(time) as earliestArticle FROM articles",
     );
     res.json({
       total: row.total,
       latest: row.latestScrape,
       earliestScrape: row.earliestScrape,
       earliestArticle: row.earliestArticle,
-      bySource
+      bySource,
     });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ error: 'Failed to retrieve stats' });
+    res.status(500).json({ error: "Failed to retrieve stats" });
   }
 });
 
-
-
 // Scrape endpoint
-app.get('/scrape', async (req, res) => {
+app.get("/scrape", async (req, res) => {
   const logs = [];
   try {
-    const sources = await configDb.all('SELECT * FROM sources');
+    const sources = await configDb.all("SELECT * FROM sources");
 
     addLog(logs, `Found ${sources.length} sources`);
 
@@ -416,28 +447,33 @@ app.get('/scrape', async (req, res) => {
       let articles;
       try {
         articles = await scrapeSource(source);
-        addLog(logs, `Loaded ${articles.length} articles from ${source.base_url}`);
+        addLog(
+          logs,
+          `Loaded ${articles.length} articles from ${source.base_url}`,
+        );
       } catch (e) {
         addLog(logs, `Failed to fetch ${source.base_url}: ${e.message}`);
         continue;
       }
 
-      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
+      const { inserted, insertedIds } = await insertArticles(
+        db,
+        articles,
+        isPg,
+      );
       insertedTotal += inserted;
       addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
-        addLog(logs, `New article IDs: ${insertedIds.join(', ')}`);
+        addLog(logs, `New article IDs: ${insertedIds.join(", ")}`);
       }
       if (insertedIds.length) {
-
         await runFilters(db, configDb, insertedIds, logs);
-
       }
       details.push({
         source_id: source.id,
         base_url: source.base_url,
         scraped: articles.length,
-        inserted
+        inserted,
       });
     }
 
@@ -446,15 +482,15 @@ app.get('/scrape', async (req, res) => {
   } catch (err) {
     logger.error(err);
     addLog(logs, `Error: ${err.message}`);
-    res.status(500).json({ error: 'Scraping failed', logs });
+    res.status(500).json({ error: "Scraping failed", logs });
   }
 });
 
 // Scrape, filter and enrich newly added matching articles
-app.get('/scrape-enrich', async (req, res) => {
+app.get("/scrape-enrich", async (req, res) => {
   const logs = [];
   try {
-    const sources = await configDb.all('SELECT * FROM sources');
+    const sources = await configDb.all("SELECT * FROM sources");
     addLog(logs, `Found ${sources.length} sources`);
 
     let insertedTotal = 0;
@@ -466,27 +502,34 @@ app.get('/scrape-enrich', async (req, res) => {
       let articles;
       try {
         articles = await scrapeSource(source);
-        addLog(logs, `Loaded ${articles.length} articles from ${source.base_url}`);
+        addLog(
+          logs,
+          `Loaded ${articles.length} articles from ${source.base_url}`,
+        );
       } catch (e) {
         addLog(logs, `Failed to fetch ${source.base_url}: ${e.message}`);
         continue;
       }
 
-      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
+      const { inserted, insertedIds } = await insertArticles(
+        db,
+        articles,
+        isPg,
+      );
       insertedTotal += inserted;
       addLog(logs, `Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
-        addLog(logs, `New article IDs: ${insertedIds.join(', ')}`);
+        addLog(logs, `New article IDs: ${insertedIds.join(", ")}`);
       }
 
       if (insertedIds.length) {
         await runFilters(db, configDb, insertedIds, logs);
-        const placeholders = insertedIds.map(() => '?').join(',');
+        const placeholders = insertedIds.map(() => "?").join(",");
         const rows = await db.all(
           `SELECT DISTINCT article_id FROM article_filter_matches WHERE article_id IN (${placeholders})`,
-          insertedIds
+          insertedIds,
         );
-        const matchedIds = rows.map(r => r.article_id);
+        const matchedIds = rows.map((r) => r.article_id);
         const enrichedIds = [];
         for (const id of matchedIds) {
           try {
@@ -498,7 +541,7 @@ app.get('/scrape-enrich', async (req, res) => {
           }
         }
         if (enrichedIds.length) {
-          addLog(logs, `Enriched article ${enrichedIds.join(', ')}`);
+          addLog(logs, `Enriched article ${enrichedIds.join(", ")}`);
         }
       }
 
@@ -506,36 +549,41 @@ app.get('/scrape-enrich', async (req, res) => {
         source_id: source.id,
         base_url: source.base_url,
         scraped: articles.length,
-        inserted
+        inserted,
       });
     }
 
     addLog(logs, `Inserted total ${insertedTotal} new articles`);
     addLog(logs, `Enriched total ${enrichedTotal} articles`);
-    res.json({ inserted: insertedTotal, enriched: enrichedTotal, details, logs });
+    res.json({
+      inserted: insertedTotal,
+      enriched: enrichedTotal,
+      details,
+      logs,
+    });
   } catch (err) {
     logger.error(err);
     addLog(logs, `Error: ${err.message}`);
-    res.status(500).json({ error: 'Full scrape failed', logs });
+    res.status(500).json({ error: "Full scrape failed", logs });
   }
 });
 
 // Streaming version of the full pipeline using Server-Sent Events
-app.get('/scrape-enrich-stream', async (req, res) => {
+app.get("/scrape-enrich-stream", async (req, res) => {
   stopPipeline = false;
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
   const logs = [];
-  const send = msg => {
+  const send = (msg) => {
     addLog(null, msg);
     res.write(`data: ${msg}\n\n`);
   };
 
   try {
-    const sources = await configDb.all('SELECT * FROM sources');
+    const sources = await configDb.all("SELECT * FROM sources");
     send(`Found ${sources.length} sources`);
 
     let insertedTotal = 0;
@@ -543,11 +591,12 @@ app.get('/scrape-enrich-stream', async (req, res) => {
 
     const toEnrich = [];
 
-
     for (const source of sources) {
       if (stopPipeline) {
-        send('Pipeline stopped');
-        res.write(`event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`);
+        send("Pipeline stopped");
+        res.write(
+          `event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`,
+        );
         return res.end();
       }
       send(`Fetching ${source.base_url}`);
@@ -560,11 +609,15 @@ app.get('/scrape-enrich-stream', async (req, res) => {
         continue;
       }
 
-      const { inserted, insertedIds } = await insertArticles(db, articles, isPg);
+      const { inserted, insertedIds } = await insertArticles(
+        db,
+        articles,
+        isPg,
+      );
       insertedTotal += inserted;
       send(`Inserted ${inserted} new articles from ${source.base_url}`);
       if (insertedIds.length) {
-        send(`New article IDs: ${insertedIds.join(', ')}`);
+        send(`New article IDs: ${insertedIds.join(", ")}`);
       }
 
       if (insertedIds.length) {
@@ -572,12 +625,12 @@ app.get('/scrape-enrich-stream', async (req, res) => {
         logs.forEach(send);
         logs.length = 0;
 
-        const placeholders = insertedIds.map(() => '?').join(',');
+        const placeholders = insertedIds.map(() => "?").join(",");
         const rows = await db.all(
           `SELECT DISTINCT article_id FROM article_filter_matches WHERE article_id IN (${placeholders})`,
-          insertedIds
+          insertedIds,
         );
-        const matchedIds = rows.map(r => r.article_id);
+        const matchedIds = rows.map((r) => r.article_id);
 
         toEnrich.push(...matchedIds);
       }
@@ -589,8 +642,10 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     let count = 0;
     for (const id of toEnrich) {
       if (stopPipeline) {
-        send('Pipeline stopped');
-        res.write(`event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`);
+        send("Pipeline stopped");
+        res.write(
+          `event: done\ndata: ${JSON.stringify({ stopped: true })}\n\n`,
+        );
         return res.end();
       }
       try {
@@ -604,40 +659,43 @@ app.get('/scrape-enrich-stream', async (req, res) => {
     }
 
     send(`Enriched total ${enrichedTotal} articles`);
-    res.write(`event: done\ndata: ${JSON.stringify({ inserted: insertedTotal, enriched: enrichedTotal })}\n\n`);
+    res.write(
+      `event: done\ndata: ${JSON.stringify({ inserted: insertedTotal, enriched: enrichedTotal })}\n\n`,
+    );
     res.end();
   } catch (err) {
     logger.error(err);
     send(`Error: ${err.message}`);
-    res.write(`event: done\ndata: ${JSON.stringify({ error: 'Full scrape failed' })}\n\n`);
+    res.write(
+      `event: done\ndata: ${JSON.stringify({ error: "Full scrape failed" })}\n\n`,
+    );
     res.end();
   }
 });
 
-app.post('/stop-pipeline', (req, res) => {
+app.post("/stop-pipeline", (req, res) => {
   stopPipeline = true;
   res.json({ stopped: true });
 });
 
 // Re-run filters for all existing articles
-app.get('/run-filters', async (req, res) => {
+app.get("/run-filters", async (req, res) => {
   const logs = [];
   try {
-    const rows = await db.all('SELECT id FROM articles');
-    const ids = rows.map(r => r.id);
+    const rows = await db.all("SELECT id FROM articles");
+    const ids = rows.map((r) => r.id);
 
-    await db.run('DELETE FROM article_filter_matches');
-    addLog(logs, 'Cleared previous filter matches');
+    await db.run("DELETE FROM article_filter_matches");
+    addLog(logs, "Cleared previous filter matches");
 
     await runFilters(db, configDb, ids, logs);
     res.json({ processed: ids.length, logs });
   } catch (err) {
     logger.error(err);
     addLog(logs, `Error: ${err.message}`);
-    res.status(500).json({ error: 'Failed to run filters', logs });
+    res.status(500).json({ error: "Failed to run filters", logs });
   }
 });
-
 
 // Run the full scrape & enrich pipeline once every 24 hours
 async function runScheduledPipeline() {
@@ -646,6 +704,6 @@ async function runScheduledPipeline() {
     const data = await res.json();
     logger.info(`Scheduled pipeline result: ${JSON.stringify(data)}`);
   } catch (err) {
-    logger.error('Scheduled pipeline failed', err);
+    logger.error("Scheduled pipeline failed", err);
   }
 }
