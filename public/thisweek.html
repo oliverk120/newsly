@@ -381,7 +381,8 @@
       }
 
       async function loadArticles() {
-        const res = await fetch("/articles/enriched-list?level=full");
+        // Use level=all to include partially enriched articles
+        const res = await fetch("/articles/enriched-list?level=all");
         const data = await res.json();
         allArticles = data.articles.map((a) => ({
           ...a,
