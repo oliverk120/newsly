@@ -1,7 +1,7 @@
 # Newsly
 
 Newsly is a small Express application that scrapes news sources and stores articles in a database managed via [Sequelize](https://sequelize.org/). Optional enrichment tasks use the OpenAI API to extract M&A details. When extracting the acquiror, seller and target, the same request also classifies whether the article is about an "M&A" transaction, a "Financing" or "Other".
-Articles can also be summarized with sector and industry labels using GPT.
+Articles can also be summarized with GPT, which provides the industry label. The Clairfield sector is derived separately using the embedding-based classifier.
 
 ## Prerequisites
 
