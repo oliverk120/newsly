@@ -211,81 +211,30 @@ async function initDb() {
     ]);
   }
 
-  const hasBody = await hasColumn(db, 'article_enrichments', 'body');
-  if (!hasBody) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN body TEXT');
-  }
-  const hasSeller = await hasColumn(db, 'article_enrichments', 'seller');
-  if (!hasSeller) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN seller TEXT');
-  }
-  const hasCompleted = await hasColumn(db, 'article_enrichments', 'completed');
-  if (!hasCompleted) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN completed TEXT');
-  }
-  const hasDate = await hasColumn(db, 'article_enrichments', 'article_date');
-  if (!hasDate) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN article_date TEXT');
-  }
-  const hasLocation = await hasColumn(db, 'article_enrichments', 'location');
-  if (!hasLocation) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN location TEXT');
-  }
-  const hasTx = await hasColumn(db, 'article_enrichments', 'transaction_type');
-  if (!hasTx) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN transaction_type TEXT');
-  }
-  const hasLog = await hasColumn(db, 'article_enrichments', 'log');
-  if (!hasLog) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN log TEXT');
-  }
-  const hasSummary = await hasColumn(db, 'article_enrichments', 'summary');
-  if (!hasSummary) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN summary TEXT');
-  }
-  const hasSector = await hasColumn(db, 'article_enrichments', 'sector');
-  if (!hasSector) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN sector TEXT');
-  }
-  const hasCurrency = await hasColumn(db, 'article_enrichments', 'currency');
-  if (!hasCurrency) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN currency TEXT');
-  }
-  const hasAboutAcq = await hasColumn(
-    db,
-    'article_enrichments',
-    'about_acquiror'
-  );
-  if (!hasAboutAcq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_acquiror TEXT');
-  }
-  const hasAboutSeller = await hasColumn(
-    db,
-    'article_enrichments',
-    'about_seller'
-  );
-  if (!hasAboutSeller) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_seller TEXT');
-  }
-  const hasAboutTarget = await hasColumn(
-    db,
-    'article_enrichments',
-    'about_target'
-  );
-  if (!hasAboutTarget) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN about_target TEXT');
-  }
-  const hasAcqHq = await hasColumn(db, 'article_enrichments', 'acquiror_hq');
-  if (!hasAcqHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN acquiror_hq TEXT');
-  }
-  const hasSellerHq = await hasColumn(db, 'article_enrichments', 'seller_hq');
-  if (!hasSellerHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN seller_hq TEXT');
-  }
-  const hasTargetHq = await hasColumn(db, 'article_enrichments', 'target_hq');
-  if (!hasTargetHq) {
-    await db.run('ALTER TABLE article_enrichments ADD COLUMN target_hq TEXT');
+  const enrichmentColumns = [
+    'body',
+    'seller',
+    'completed',
+    'article_date',
+    'location',
+    'transaction_type',
+    'log',
+    'summary',
+    'sector',
+    'currency',
+    'about_acquiror',
+    'about_seller',
+    'about_target',
+    'acquiror_hq',
+    'seller_hq',
+    'target_hq'
+  ];
+
+  for (const col of enrichmentColumns) {
+    const exists = await hasColumn(db, 'article_enrichments', col);
+    if (!exists) {
+      await db.run(`ALTER TABLE article_enrichments ADD COLUMN ${col} TEXT`);
+    }
   }
 
   await configDb.run(`CREATE TABLE IF NOT EXISTS sources (
@@ -302,21 +251,16 @@ async function initDb() {
     date_selector TEXT
   )`);
 
-  const hasBodySel = await hasColumn(configDb, 'sources', 'body_selector');
-  if (!hasBodySel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN body_selector TEXT');
-  }
-  const hasLocationSel = await hasColumn(
-    configDb,
-    'sources',
-    'location_selector'
-  );
-  if (!hasLocationSel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN location_selector TEXT');
-  }
-  const hasDateSel = await hasColumn(configDb, 'sources', 'date_selector');
-  if (!hasDateSel) {
-    await configDb.run('ALTER TABLE sources ADD COLUMN date_selector TEXT');
+  const sourceColumns = [
+    'body_selector',
+    'location_selector',
+    'date_selector'
+  ];
+  for (const col of sourceColumns) {
+    const exists = await hasColumn(configDb, 'sources', col);
+    if (!exists) {
+      await configDb.run(`ALTER TABLE sources ADD COLUMN ${col} TEXT`);
+    }
   }
 
   const row = await configDb.get('SELECT COUNT(*) as count FROM sources');
