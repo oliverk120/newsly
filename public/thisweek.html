@@ -87,7 +87,7 @@
       <span
         data-range="month"
         data-label="This Month"
-        class="date-pill cursor-not-allowed rounded-full px-2 py-1 text-sm bg-gray-300 text-gray-500"
+        class="date-pill cursor-pointer rounded-full px-2 py-1 text-sm bg-gray-200"
         >This Month</span
       >
 
@@ -230,10 +230,9 @@
             let start, end;
             if (dateRange === "week") {
               const day = nowET.getDay();
-              const diff = (day === 0 ? -6 : 1) - day;
               start = new Date(nowET);
               start.setHours(0, 1, 0, 0);
-              start.setDate(start.getDate() + diff);
+              start.setDate(start.getDate() - day);
               end = new Date(start);
               end.setDate(start.getDate() + 7);
             } else if (dateRange === "month") {
