@@ -51,3 +51,26 @@ test('uses target and acquiror locations when available', async () => {
   const html = createTombstone(article);
   assert(html.includes('Canada / USA'));
 });
+
+test('strips city details from locations', async () => {
+  const { createTombstone } = await loadModule();
+  const article = {
+    acquiror_location: 'Munich, Germany',
+    target_location: 'Paris, France',
+    transaction_type: 'Other'
+  };
+  const html = createTombstone(article);
+  assert(html.includes('France / Germany'));
+  assert(!html.includes('Munich'));
+  assert(!html.includes('Paris'));
+});
+
+test('returns flags for new countries', async () => {
+  const { createTombstone } = await loadModule();
+  const article = {
+    location: 'Moscow, Russia',
+    transaction_type: 'Other'
+  };
+  const html = createTombstone(article);
+  assert(html.includes('🇷🇺'));
+});
