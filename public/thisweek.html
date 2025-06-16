@@ -109,8 +109,7 @@
           <th class="border px-2 py-1 w-1/3">Summary</th>
           <th class="border px-2 py-1">Sector/Industry/Buyer Type</th>
           <th class="border px-2 py-1">Location</th>
-          <th class="border px-2 py-1">Deal Value _basecurrency</th>
-          <th class="border px-2 py-1">Currency</th>
+          <th class="border px-2 py-1">Deal Value</th>
         </tr>
       </thead>
       <tbody id="articlesBody"></tbody>
@@ -287,14 +286,15 @@
             a.title.length > 60 ? a.title.slice(0, 60) + "..." : a.title;
           const titleLink = `<a class="text-blue-600 underline" href="${a.link}" target="_blank">${escapeHtml(truncated)}</a>`;
           const summary = `${escapeHtml(a.summary || "")}<br>${titleLink}`;
+          const currency = a.currency || extractCurrency(a.deal_value);
+          const dealValue = `${a.deal_value || ""}${currency ? " " + currency : ""}`;
           tr.innerHTML =
             `<td class="border px-2 py-1">${idx + 1}</td>` +
             `<td class="border px-2 py-1">${tombstone}</td>` +
             `<td class="border px-2 py-1 w-1/3">${summary}</td>` +
             `<td class="border px-2 py-1">${sectorHtml}</td>` +
             `<td class="border px-2 py-1">${a.location || ""}</td>` +
-            `<td class="border px-2 py-1">${a.deal_value || ""}</td>` +
-            `<td class="border px-2 py-1">${a.currency || extractCurrency(a.deal_value)}</td>`;
+            `<td class="border px-2 py-1">${dealValue}</td>`;
           tbody.appendChild(tr);
         });
       }
