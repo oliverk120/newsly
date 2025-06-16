@@ -36,3 +36,18 @@ test('omits links when URLs missing', async () => {
   const html = createTombstone(article);
   assert(!html.includes('<a'));
 });
+
+test('uses target and acquiror locations when available', async () => {
+  const { createTombstone } = await loadModule();
+  const article = {
+    acquiror: 'Acme',
+    seller: 'SellerCo',
+    target: 'Target',
+    acquiror_location: 'USA',
+    target_location: 'Canada',
+    location: 'France',
+    transaction_type: 'M&A'
+  };
+  const html = createTombstone(article);
+  assert(html.includes('Canada / USA'));
+});
