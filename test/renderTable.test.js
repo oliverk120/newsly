@@ -70,14 +70,15 @@ test('renderArticles populates table rows', async () => {
       const truncated = a.title.length > 60 ? a.title.slice(0, 60) + '...' : a.title;
       const titleLink = `<a class="text-blue-600 underline" href="${a.link}" target="_blank">${escapeHtml(truncated)}</a>`;
       const summary = `${escapeHtml(a.summary || '')}<br>${titleLink}`;
+      const currency = a.currency || extractCurrency(a.deal_value);
+      const dealValue = `${a.deal_value || ''}${currency ? ' ' + currency : ''}`;
       const rowHtml =
         `<td class="border px-2 py-1">${idx + 1}</td>` +
         `<td class="border px-2 py-1">${tombstone}</td>` +
         `<td class="border px-2 py-1 w-1/3">${summary}</td>` +
         `<td class="border px-2 py-1">${sectorHtml}</td>` +
         `<td class="border px-2 py-1">${a.location || ''}</td>` +
-        `<td class="border px-2 py-1">${a.deal_value || ''}</td>` +
-        `<td class="border px-2 py-1">${a.currency || extractCurrency(a.deal_value)}</td>`;
+        `<td class="border px-2 py-1">${dealValue}</td>`;
       tbody.append(rowHtml);
     });
   }
