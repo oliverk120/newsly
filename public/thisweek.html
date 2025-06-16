@@ -436,12 +436,14 @@
         // Use level=all to include partially enriched articles
         const res = await fetch("/articles/enriched-list?level=all");
         const data = await res.json();
-        allArticles = data.articles.map((a) => ({
-          ...a,
-          valueBucket: valueBucket(a.deal_value),
-          acquirorType: a.acquiror_type,
-        }));
-        articleTotal = data.stats.total;
+        allArticles = data.articles
+          .filter((a) => a.transaction_type === 'M&A')
+          .map((a) => ({
+            ...a,
+            valueBucket: valueBucket(a.deal_value),
+            acquirorType: a.acquiror_type,
+          }));
+        articleTotal = allArticles.length;
         updateSummary();
         renderArticles();
         updateStats();
