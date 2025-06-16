@@ -183,13 +183,13 @@ async function initDb() {
       'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'summarizeArticle',
-        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and include each party\'s website URL if available. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_url":"...","acquiror_location":"...","target_url":"...","target_location":"...","seller_url":"...","seller_location":"..."}. Text: "{text}"',
-        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location'
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and include each party\'s website URL if available. Classify the acquiror type as "Private equity firm", "Other financial buyer", "lender", "strategic buyer" or "N/A". Respond with JSON {"summary":"...","sector":"...","industry":"...","acquiror_type":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_url":"...","acquiror_location":"...","target_url":"...","target_location":"...","seller_url":"...","seller_location":"..."}. Text: "{text}"',
+        'summary,sector,industry,acquiror_type,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location'
       ]
     );
   } else if (!sumRow.fields) {
     await configDb.run('UPDATE prompts SET fields = ? WHERE name = ?', [
-      'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location',
+      'summary,sector,industry,acquiror_type,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location',
       'summarizeArticle'
     ]);
   }
@@ -225,6 +225,7 @@ async function initDb() {
     'summary',
     'sector',
     'currency',
+    'acquiror_type',
     'about_acquiror',
     'about_seller',
     'about_target',
