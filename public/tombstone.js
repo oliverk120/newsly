@@ -31,7 +31,29 @@ const countryFlags = {
   'india': '🇮🇳',
   'brazil': '🇧🇷',
   'mexico': '🇲🇽',
-  'dominican republic': '🇩🇴'
+  'dominican republic': '🇩🇴',
+  'russia': '🇷🇺',
+  'south korea': '🇰🇷',
+  'korea': '🇰🇷',
+  'sweden': '🇸🇪',
+  'norway': '🇳🇴',
+  'denmark': '🇩🇰',
+  'finland': '🇫🇮',
+  'belgium': '🇧🇪',
+  'austria': '🇦🇹',
+  'ireland': '🇮🇪',
+  'portugal': '🇵🇹',
+  'poland': '🇵🇱',
+  'turkey': '🇹🇷',
+  'saudi arabia': '🇸🇦',
+  'united arab emirates': '🇦🇪',
+  'uae': '🇦🇪',
+  'south africa': '🇿🇦',
+  'new zealand': '🇳🇿',
+  'argentina': '🇦🇷',
+  'singapore': '🇸🇬',
+  'hong kong': '🇭🇰',
+  'israel': '🇮🇱'
 };
 
 function flagFromLocation(location) {
@@ -39,6 +61,12 @@ function flagFromLocation(location) {
   const parts = location.split(',');
   const country = parts[parts.length - 1].trim().toLowerCase();
   return countryFlags[country] || '';
+}
+
+function extractCountry(location) {
+  if (!location) return '';
+  const parts = location.split(',');
+  return parts[parts.length - 1].trim();
 }
 
 function formatParty(name, url) {
@@ -70,8 +98,10 @@ export function createTombstone(article) {
     ? article.transaction_type.trim()
     : '';
   const txType = txTypeRaw ? escapeHtml(txTypeRaw) : '';
-  const tLoc = article.target_location || article.targetLocation || '';
-  const aLoc = article.acquiror_location || article.acquirorLocation || '';
+  const tLocFull = article.target_location || article.targetLocation || '';
+  const aLocFull = article.acquiror_location || article.acquirorLocation || '';
+  const tLoc = extractCountry(tLocFull);
+  const aLoc = extractCountry(aLocFull);
   let location = '';
   if (tLoc && aLoc) {
     location = `${escapeHtml(tLoc)} / ${escapeHtml(aLoc)}`;
@@ -80,9 +110,9 @@ export function createTombstone(article) {
   } else if (aLoc) {
     location = escapeHtml(aLoc);
   } else if (article.location && article.location !== 'N/A') {
-    location = escapeHtml(article.location);
+    location = escapeHtml(extractCountry(article.location));
   }
-  const flag = flagFromLocation(location);
+  const flag = flagFromLocation(tLocFull || aLocFull || article.location || '');
 
   const bodyLines = [];
   if (txTypeRaw === 'M&A') {
