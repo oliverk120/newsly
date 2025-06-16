@@ -105,7 +105,9 @@ router.get('/enrich-list', async (req, res) => {
     SELECT DISTINCT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
            ae.about_acquiror, ae.about_seller, ae.about_target,
-           ae.acquiror_url, ae.seller_url, ae.target_url,
+           ae.acquiror_url, ae.acquiror_location,
+           ae.seller_url, ae.seller_location,
+           ae.target_url, ae.target_location,
            ae.deal_value, ae.currency, ae.location, ae.article_date,
            ae.transaction_type, ae.embedding, ae.log,
            ae.summary, ae.sector, ae.industry
@@ -160,7 +162,9 @@ router.get('/enriched-list', async (req, res) => {
             ${agg} as filter_ids,
             ae.body, ae.acquiror, ae.seller, ae.target,
             ae.about_acquiror, ae.about_seller, ae.about_target,
-            ae.acquiror_url, ae.seller_url, ae.target_url,
+            ae.acquiror_url, ae.acquiror_location,
+            ae.seller_url, ae.seller_location,
+            ae.target_url, ae.target_location,
             ae.deal_value, ae.currency, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
@@ -171,7 +175,9 @@ router.get('/enriched-list', async (req, res) => {
       GROUP BY a.id, a.title, a.description, a.time, a.link,
                ae.body, ae.acquiror, ae.seller, ae.target,
                ae.about_acquiror, ae.about_seller, ae.about_target,
-               ae.acquiror_url, ae.seller_url, ae.target_url,
+               ae.acquiror_url, ae.acquiror_location,
+               ae.seller_url, ae.seller_location,
+               ae.target_url, ae.target_location,
                ae.deal_value, ae.currency, ae.location, ae.article_date,
                ae.transaction_type, ae.log,
                ae.summary, ae.sector, ae.industry
@@ -274,7 +280,9 @@ router.post('/:id/summarize', async (req, res) => {
     const row = await db.get(
       `SELECT summary, sector, industry,
               about_acquiror, about_seller, about_target,
-              acquiror_url, seller_url, target_url
+              acquiror_url, acquiror_location,
+              seller_url, seller_location,
+              target_url, target_location
          FROM article_enrichments WHERE article_id = ?`,
       [id]
     );
@@ -287,8 +295,11 @@ router.post('/:id/summarize', async (req, res) => {
       aboutSeller: row.about_seller,
       aboutTarget: row.about_target,
       acquirorUrl: row.acquiror_url,
+      acquirorLocation: row.acquiror_location,
       sellerUrl: row.seller_url,
-      targetUrl: row.target_url
+      sellerLocation: row.seller_location,
+      targetUrl: row.target_url,
+      targetLocation: row.target_location
     });
   } catch (err) {
     console.error(err);

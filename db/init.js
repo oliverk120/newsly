@@ -92,8 +92,11 @@ async function initDb() {
     about_seller TEXT,
     about_target TEXT,
     acquiror_url TEXT,
+    acquiror_location TEXT,
     seller_url TEXT,
+    seller_location TEXT,
     target_url TEXT,
+    target_location TEXT,
     deal_value TEXT,
     currency TEXT,
     industry TEXT,
@@ -180,13 +183,13 @@ async function initDb() {
       'INSERT INTO prompts (name, template, fields) VALUES (?, ?, ?)',
       [
         'summarizeArticle',
-        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and include each party\'s website URL if available. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_url":"...","target_url":"...","seller_url":"..."}. Text: "{text}"',
-        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,target_url,seller_url'
+        'Summarize the following article in 2-3 sentences and classify the Clairfield sector and industry. Provide a short note about the acquiror, target and seller and include each party\'s website URL if available. Respond with JSON {"summary":"...","sector":"...","industry":"...","about_acquiror":"...","about_target":"...","about_seller":"...","acquiror_url":"...","acquiror_location":"...","target_url":"...","target_location":"...","seller_url":"...","seller_location":"..."}. Text: "{text}"',
+        'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location'
       ]
     );
   } else if (!sumRow.fields) {
     await configDb.run('UPDATE prompts SET fields = ? WHERE name = ?', [
-      'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,target_url,seller_url',
+      'summary,sector,industry,about_acquiror,about_target,about_seller,acquiror_url,acquiror_location,target_url,target_location,seller_url,seller_location',
       'summarizeArticle'
     ]);
   }
@@ -226,8 +229,11 @@ async function initDb() {
     'about_seller',
     'about_target',
     'acquiror_url',
+    'acquiror_location',
     'seller_url',
-    'target_url'
+    'seller_location',
+    'target_url',
+    'target_location'
   ];
 
   for (const col of enrichmentColumns) {

@@ -70,7 +70,18 @@ export function createTombstone(article) {
     ? article.transaction_type.trim()
     : '';
   const txType = txTypeRaw ? escapeHtml(txTypeRaw) : '';
-  const location = article.location && article.location !== 'N/A' ? escapeHtml(article.location) : '';
+  const tLoc = article.target_location || article.targetLocation || '';
+  const aLoc = article.acquiror_location || article.acquirorLocation || '';
+  let location = '';
+  if (tLoc && aLoc) {
+    location = `${escapeHtml(tLoc)} / ${escapeHtml(aLoc)}`;
+  } else if (tLoc) {
+    location = escapeHtml(tLoc);
+  } else if (aLoc) {
+    location = escapeHtml(aLoc);
+  } else if (article.location && article.location !== 'N/A') {
+    location = escapeHtml(article.location);
+  }
   const flag = flagFromLocation(location);
 
   const bodyLines = [];
