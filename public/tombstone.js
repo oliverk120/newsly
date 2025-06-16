@@ -57,10 +57,10 @@ const countryFlags = {
 };
 
 export const acquirorTypeIcons = {
-  'private equity firm': '💼',
+  'private equity firm': '👔',
   'other financial buyer': '💰',
   lender: '🏦',
-  'strategic buyer': '🤝'
+  'strategic buyer': '🏭'
 };
 
 function flagFromLocation(location) {
