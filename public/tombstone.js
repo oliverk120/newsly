@@ -105,6 +105,13 @@ export function createTombstone(article) {
     ? article.transaction_type.trim()
     : '';
   const txType = txTypeRaw ? escapeHtml(txTypeRaw) : '';
+  const acqTypeRaw =
+    article.acquiror_type || article.acquirorType || '';
+  const acqType =
+    acqTypeRaw && acqTypeRaw !== 'N/A' ? escapeHtml(acqTypeRaw) : '';
+  const acqTypeIcon = acqTypeRaw
+    ? acquirorTypeIcons[acqTypeRaw.toLowerCase()] || ''
+    : '';
   const tLocFull = article.target_location || article.targetLocation || '';
   const aLocFull = article.acquiror_location || article.acquirorLocation || '';
   const tLoc = extractCountry(tLocFull);
@@ -125,7 +132,10 @@ export function createTombstone(article) {
   if (txTypeRaw === 'M&A') {
     if (acq) {
       const title = aboutAcq ? ` title="${escapeAttr(aboutAcq)}"` : '';
-      bodyLines.push(`<div class="font-bold text-center"${title}>${acq}</div>`);
+      const icon = acqTypeIcon ? acqTypeIcon + ' ' : '';
+      bodyLines.push(
+        `<div class="font-bold text-center"${title}>${icon}${acq}</div>`
+      );
     }
     if (target || acq) bodyLines.push('<div class="text-center">acquired</div>');
     if (target) {
@@ -163,7 +173,12 @@ export function createTombstone(article) {
     }
   }
 
-  const header = `<div class="bg-gray-200 w-full text-center font-semibold text-xs">${txType || '&nbsp;'}</div>`;
+  const headerLabel = acqType
+    ? `${txType} - ${acqType}`
+    : txType;
+  const header = `<div class="bg-gray-200 w-full text-center font-semibold text-sm">${
+    headerLabel || '&nbsp;'
+  }</div>`;
   const footer = location
     ? `<div class="text-xs text-center w-full">${flag ? flag + ' ' : ''}${location}</div>`
     : '<div class="text-xs text-center w-full">&nbsp;</div>';
