@@ -68,7 +68,7 @@
       <tbody id="articlesBody"></tbody>
     </table>
     <script type="module">
-      import { createTombstone, escapeHtml } from './tombstone.js';
+      import { createTombstone, escapeHtml, acquirorTypeIcons } from './tombstone.js';
       import { sectorIcons } from './sectorIcons.js';
 
       function formatBody(text) {
@@ -110,7 +110,7 @@
       }
 
       let allArticles = [];
-      const filters = { keyword: '', sector: '', industry: '', dealValue: '' };
+      const filters = { keyword: '', sector: '', industry: '', dealValue: '', acquirorType: '' };
 
       function parseDealValueMillions(str) {
         if (!str) return null;
@@ -147,6 +147,7 @@
           if (ignore !== 'sector' && filters.sector && a.sector !== filters.sector) return false;
           if (ignore !== 'industry' && filters.industry && a.industry !== filters.industry) return false;
           if (ignore !== 'dealValue' && filters.dealValue && a.valueBucket !== filters.dealValue) return false;
+          if (ignore !== 'acquirorType' && filters.acquirorType && a.acquirorType !== filters.acquirorType) return false;
           if (kw) {
             const text = `${a.title} ${a.description || ''} ${a.body || ''}`.toLowerCase();
             if (!text.includes(kw)) return false;
@@ -205,9 +206,16 @@
           valueCounts[b] = (valueCounts[b] || 0) + 1;
         });
 
+        const typeCounts = {};
+        getRows('acquirorType').forEach(a => {
+          const t = a.acquirorType;
+          if (t && t !== 'N/A') typeCounts[t] = (typeCounts[t] || 0) + 1;
+        });
+
         const groups = {
           sector: Object.keys(sectorCounts),
           industry: Object.keys(industryCounts),
+          acquirorType: Object.keys(typeCounts),
           dealValue: ['0-20M','20-100M','100M-1B','1B+','Undisclosed'].filter(b => valueCounts[b])
         };
         Object.entries(groups).forEach(([field, values]) => {
@@ -216,8 +224,12 @@
           label.className = 'font-semibold mr-2';
           if (field === 'sector') {
             label.textContent = 'Clairfield Sector:';
+          } else if (field === 'dealValue') {
+            label.textContent = 'Deal Value:';
+          } else if (field === 'acquirorType') {
+            label.textContent = 'Acquiror Type:';
           } else {
-            label.textContent = field === 'dealValue' ? 'Deal Value:' : 'Industry:';
+            label.textContent = 'Industry:';
           }
           container.appendChild(label);
           values.slice(0, 10).forEach(v => {
@@ -229,6 +241,10 @@
             } else if (field === 'industry') {
               const count = industryCounts[v] || 0;
               pill.textContent = `${v} (${count})`;
+            } else if (field === 'acquirorType') {
+              const icon = acquirorTypeIcons[v.toLowerCase()] || '';
+              const count = typeCounts[v] || 0;
+              pill.innerHTML = `${icon} ${v} (${count})`;
             } else {
               const count = valueCounts[v] || 0;
               pill.textContent = `${v} (${count})`;
@@ -259,7 +275,11 @@
         const level = document.getElementById('levelSelect').value;
         const res = await fetch('/articles/enriched-list?level=' + level);
         const data = await res.json();
-        allArticles = data.articles.map(a => ({ ...a, valueBucket: valueBucket(a.deal_value) }));
+        allArticles = data.articles.map(a => ({
+          ...a,
+          valueBucket: valueBucket(a.deal_value),
+          acquirorType: a.acquiror_type
+        }));
         document.getElementById('stats').textContent = `Total: ${data.stats.total} | Fully Complete: ${data.stats.full} | Incomplete: ${data.stats.partial}`;
         updateSummary();
         renderArticles();
