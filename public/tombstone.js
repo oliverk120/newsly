@@ -105,11 +105,6 @@ export function createTombstone(article) {
     ? article.transaction_type.trim()
     : '';
   const txType = txTypeRaw ? escapeHtml(txTypeRaw) : '';
-  const acqTypeRaw = (article.acquiror_type || article.acquirorType || '').trim();
-  const acqTypeIcon =
-    acqTypeRaw && acqTypeRaw !== 'N/A'
-      ? acquirorTypeIcons[acqTypeRaw.toLowerCase()] || ''
-      : '';
   const tLocFull = article.target_location || article.targetLocation || '';
   const aLocFull = article.acquiror_location || article.acquirorLocation || '';
   const tLoc = extractCountry(tLocFull);
@@ -168,10 +163,7 @@ export function createTombstone(article) {
     }
   }
 
-  const iconHtml = acqTypeIcon
-    ? ` <span title="${escapeAttr(acqTypeRaw)}">${acqTypeIcon}</span>`
-    : '';
-  const header = `<div class="bg-gray-200 w-full text-center font-semibold text-xs">${txType || '&nbsp;'}${iconHtml}</div>`;
+  const header = `<div class="bg-gray-200 w-full text-center font-semibold text-xs">${txType || '&nbsp;'}</div>`;
   const footer = location
     ? `<div class="text-xs text-center w-full">${flag ? flag + ' ' : ''}${location}</div>`
     : '<div class="text-xs text-center w-full">&nbsp;</div>';
