@@ -173,18 +173,20 @@ export function createTombstone(article) {
     }
   }
 
-  const headerLabel = acqType
-    ? `${txType} - ${acqType}`
-    : txType;
-  const header = `<div class="bg-gray-200 w-full text-center font-semibold text-sm">${
-    headerLabel || '&nbsp;'
-  }</div>`;
+  const headerParts = [];
+  if (txType) headerParts.push(`<span class="font-semibold">${txType}</span>`);
+  if (acqType) headerParts.push(`<span>${acqType}</span>`);
+  const headerLabel = headerParts.join(' - ') || '&nbsp;';
+  const header =
+    `<div class="w-full text-center text-sm text-white" style="background-color: rgb(0,44,80); padding-top:5px; padding-bottom:5px;">` +
+    `${headerLabel}` +
+    `</div>`;
   const footer = location
     ? `<div class="text-xs text-center w-full">${flag ? flag + ' ' : ''}${location}</div>`
     : '<div class="text-xs text-center w-full">&nbsp;</div>';
 
   return (
-    `<div class="flex flex-col justify-between items-center p-2 border rounded bg-gray-50 w-[14.4rem] h-[15rem]">` +
+    `<div class="flex flex-col justify-between items-center p-2 border rounded bg-gray-50 w-[14.4rem] h-[15rem]" style="border-color: rgb(0,44,80)">` +
     header +
     `<div class="flex flex-col items-center flex-grow justify-center space-y-1">${bodyLines.join('')}</div>` +
     footer +
