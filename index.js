@@ -37,6 +37,12 @@ async function startServer() {
   // Run the full scrape & enrich pipeline once every 24 hours
   const DAY_MS = 24 * 60 * 60 * 1000;
   setInterval(runScheduledPipeline, DAY_MS);
+
+  // Hourly log to verify timers are active
+  const HOUR_MS = 60 * 60 * 1000;
+  setInterval(() => {
+    logger.info(`Hourly timer tick at ${new Date().toISOString()}`);
+  }, HOUR_MS);
 }
 
 startServer();
