@@ -57,7 +57,7 @@ router.get('/mna-today', async (req, res) => {
   const query = `
     SELECT a.id, a.title, a.description, a.time, a.link,
            ae.body, ae.acquiror, ae.seller, ae.target,
-           ae.location, ae.article_date,
+           ae.acquiror_type, ae.location, ae.article_date,
            ae.transaction_type, ae.log
     FROM articles a
     JOIN article_filter_matches m ON a.id = m.article_id
@@ -108,7 +108,7 @@ router.get('/enrich-list', async (req, res) => {
            ae.acquiror_url, ae.acquiror_location,
            ae.seller_url, ae.seller_location,
            ae.target_url, ae.target_location,
-           ae.deal_value, ae.currency, ae.location, ae.article_date,
+           ae.deal_value, ae.currency, ae.acquiror_type, ae.location, ae.article_date,
            ae.transaction_type, ae.embedding, ae.log,
            ae.summary, ae.sector, ae.industry
     FROM articles a
@@ -165,7 +165,7 @@ router.get('/enriched-list', async (req, res) => {
             ae.acquiror_url, ae.acquiror_location,
             ae.seller_url, ae.seller_location,
             ae.target_url, ae.target_location,
-            ae.deal_value, ae.currency, ae.location, ae.article_date,
+            ae.deal_value, ae.currency, ae.acquiror_type, ae.location, ae.article_date,
             ae.transaction_type, ae.log,
             ae.summary, ae.sector, ae.industry
        FROM articles a
@@ -178,7 +178,7 @@ router.get('/enriched-list', async (req, res) => {
                ae.acquiror_url, ae.acquiror_location,
                ae.seller_url, ae.seller_location,
                ae.target_url, ae.target_location,
-               ae.deal_value, ae.currency, ae.location, ae.article_date,
+               ae.deal_value, ae.currency, ae.acquiror_type, ae.location, ae.article_date,
                ae.transaction_type, ae.log,
                ae.summary, ae.sector, ae.industry
       ORDER BY a.time DESC`
@@ -278,7 +278,7 @@ router.post('/:id/summarize', async (req, res) => {
   try {
     await processArticle(id, ['summary']);
     const row = await db.get(
-      `SELECT summary, sector, industry,
+      `SELECT summary, sector, industry, acquiror_type,
               about_acquiror, about_seller, about_target,
               acquiror_url, acquiror_location,
               seller_url, seller_location,
@@ -291,6 +291,7 @@ router.post('/:id/summarize', async (req, res) => {
       summary: row.summary,
       sector: row.sector,
       industry: row.industry,
+      acquirorType: row.acquiror_type,
       aboutAcquiror: row.about_acquiror,
       aboutSeller: row.about_seller,
       aboutTarget: row.about_target,
