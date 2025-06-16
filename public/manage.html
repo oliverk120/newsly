@@ -11,7 +11,15 @@
       import { loadMenu } from "./menu.js";
       loadMenu();
     </script>
-    <h1 class="text-2xl font-bold mb-4">Configuration</h1>
+    <h1 class="text-2xl font-bold mb-2">Configuration</h1>
+    <div class="text-sm text-gray-600 mb-4">
+      <p>The pipeline works as follows:</p>
+      <ol class="list-decimal list-inside ml-4">
+        <li>Scrape each configured source using the selectors below to pull the article, title, description, time, link, image, body, location and date tags.</li>
+        <li>Insert new articles into the database and check them against all active keyword filters.</li>
+        <li>For articles that match a filter, run enrichment steps in order: fetch body text, extract date and location, run the Extract Parties prompt, run the Summarize Article prompt, then run the Value &amp; Location prompt.</li>
+      </ol>
+    </div>
 
     <h2 class="text-xl font-semibold mb-2">Sources</h2>
     <form id="addSourceForm" class="mb-4">
