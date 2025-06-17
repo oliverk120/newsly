@@ -49,7 +49,7 @@ test('uses target and acquiror locations when available', async () => {
     transaction_type: 'M&A'
   };
   const html = createTombstone(article);
-  assert(html.includes('Canada / USA'));
+  assert(html.includes('🇨🇦'));
 });
 
 test('strips city details from locations', async () => {
@@ -60,9 +60,11 @@ test('strips city details from locations', async () => {
     transaction_type: 'Other'
   };
   const html = createTombstone(article);
-  assert(html.includes('France / Germany'));
+  assert(html.includes('🇫🇷'));
   assert(!html.includes('Munich'));
   assert(!html.includes('Paris'));
+  assert(!html.includes('Germany'));
+  assert(!html.includes('France'));
 });
 
 test('returns flags for new countries', async () => {

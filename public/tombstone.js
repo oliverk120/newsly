@@ -181,8 +181,8 @@ export function createTombstone(article) {
     `<div class="w-full text-center text-sm text-white" style="background-color: rgb(0,44,80); padding-top:5px; padding-bottom:5px;">` +
     `${headerLabel}` +
     `</div>`;
-  const footer = location
-    ? `<div class="text-xs text-center w-full">${flag ? flag + ' ' : ''}${location}</div>`
+  const footer = flag
+    ? `<div class="text-xs text-center w-full">${flag}</div>`
     : '<div class="text-xs text-center w-full">&nbsp;</div>';
 
   return (
