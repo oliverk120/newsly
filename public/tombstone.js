@@ -109,32 +109,17 @@ export function createTombstone(article) {
     article.acquiror_type || article.acquirorType || '';
   const acqType =
     acqTypeRaw && acqTypeRaw !== 'N/A' ? escapeHtml(acqTypeRaw) : '';
-  const acqTypeIcon = acqTypeRaw
-    ? acquirorTypeIcons[acqTypeRaw.toLowerCase()] || ''
-    : '';
   const tLocFull = article.target_location || article.targetLocation || '';
   const aLocFull = article.acquiror_location || article.acquirorLocation || '';
   const tLoc = extractCountry(tLocFull);
   const aLoc = extractCountry(aLocFull);
-  let location = '';
-  if (tLoc && aLoc) {
-    location = `${escapeHtml(tLoc)} / ${escapeHtml(aLoc)}`;
-  } else if (tLoc) {
-    location = escapeHtml(tLoc);
-  } else if (aLoc) {
-    location = escapeHtml(aLoc);
-  } else if (article.location && article.location !== 'N/A') {
-    location = escapeHtml(extractCountry(article.location));
-  }
-  const flag = flagFromLocation(tLocFull || aLocFull || article.location || '');
 
   const bodyLines = [];
   if (txTypeRaw === 'M&A') {
     if (acq) {
       const title = aboutAcq ? ` title="${escapeAttr(aboutAcq)}"` : '';
-      const icon = acqTypeIcon ? acqTypeIcon + ' ' : '';
       bodyLines.push(
-        `<div class="font-bold text-center"${title}>${icon}${acq}</div>`
+        `<div class="font-bold text-center"${title}>${acq}</div>`
       );
     }
     if (target || acq) bodyLines.push('<div class="text-center">acquired</div>');
@@ -181,9 +166,7 @@ export function createTombstone(article) {
     `<div class="w-full text-center text-sm text-white" style="background-color: rgb(0,44,80); padding-top:5px; padding-bottom:5px;">` +
     `${headerLabel}` +
     `</div>`;
-  const footer = flag
-    ? `<div class="text-xs text-center w-full">${flag}</div>`
-    : '<div class="text-xs text-center w-full">&nbsp;</div>';
+  const footer = '<div class="text-xs text-center w-full">&nbsp;</div>';
 
   return (
     `<div class="flex flex-col justify-between items-center p-2 border rounded bg-gray-50 w-[14.4rem] h-[15rem]" style="border-color: rgb(0,44,80)">` +
