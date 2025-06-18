@@ -4,20 +4,23 @@ const insertArticles = require('../lib/insertArticles');
 
 function createDb(options) {
   const inserted = [];
+  const seen = new Set();
   return {
     run: async (sql, params) => {
       const id = options.nextId++;
+      const link = params[3];
+      const duplicate = seen.has(link);
+      if (!duplicate) seen.add(link);
+
       if (options.isPg) {
-        // Postgres style: no lastID returned
         inserted.push({ id, params });
-        if (options.missingRowCount) return {};
-        return { changes: 1 };
+        if (options.missingRowCount) return duplicate ? {} : {};
+        return { changes: duplicate ? 0 : 1 };
       }
       inserted.push({ id, params });
-      return { changes: 1, lastID: id };
+      return { changes: duplicate ? 0 : 1, lastID: id };
     },
     get: async (sql, params) => {
-      // return id based on params
       const match = inserted.find(r => r.params[3] === params[0]);
       return match ? { id: match.id } : undefined;
     }
@@ -52,4 +55,13 @@ test('handles missing rowCount by verifying row existence', async () => {
   const { inserted, insertedIds } = await insertArticles(db, articles, true);
   assert.equal(inserted, 1);
   assert.deepEqual(insertedIds, [20]);
+});
+
+test('ignores duplicate articles for postgres', async () => {
+  const db = createDb({ nextId: 30, isPg: true });
+  const a = { title: 'dup', description: '', time: '1', link: 'd', image: null };
+  await insertArticles(db, [a], true);
+  const { inserted, insertedIds } = await insertArticles(db, [a], true);
+  assert.equal(inserted, 0);
+  assert.deepEqual(insertedIds, []);
 });
