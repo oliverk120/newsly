@@ -15,6 +15,7 @@
 
     <div class="mb-4 space-y-2">
       <button id="scrapeEnrichBtn" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded w-full">Scrape &amp; Enrich</button>
+      <button id="stopBtn" class="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded w-full">Stop</button>
       <form id="pipelineForm" class="flex flex-wrap items-center space-x-2">
         <label class="mr-2"><input type="checkbox" name="steps" value="filters" checked> Filters</label>
         <label class="mr-2"><input type="checkbox" name="steps" value="body" checked> Body</label>
@@ -163,29 +164,39 @@
       }
 
       const scrapeEnrichBtn = document.getElementById('scrapeEnrichBtn');
+      const stopBtn = document.getElementById('stopBtn');
       const pipelineForm = document.getElementById('pipelineForm');
       const runMissingBtn = document.getElementById('runMissingBtn');
+      let currentES = null;
+
+      function closeES() {
+        if (currentES) {
+          currentES.close();
+          currentES = null;
+        }
+      }
 
       scrapeEnrichBtn.addEventListener('click', () => {
+        closeES();
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
         resetProgress();
         div.textContent = 'Running full pipeline...';
 
-        const es = new EventSource('/scrape-enrich-stream');
-        es.onmessage = e => {
+        currentES = new EventSource('/scrape-enrich-stream');
+        currentES.onmessage = e => {
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
-        es.addEventListener('step', e => {
+        currentES.addEventListener('step', e => {
           try {
             const data = JSON.parse(e.data);
             updateProgress(data.id, data.step);
           } catch {}
         });
-        es.addEventListener('done', e => {
-          es.close();
+        currentES.addEventListener('done', e => {
+          closeES();
           try {
             const data = JSON.parse(e.data);
             div.innerHTML = `Inserted total ${data.inserted} new articles` +
@@ -199,6 +210,7 @@
       });
 
       runMissingBtn.addEventListener('click', () => {
+        closeES();
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
@@ -214,19 +226,19 @@
         if (since) params.set('since', since);
         params.set('incomplete', '1');
 
-        const es = new EventSource(`/pipeline/run-stream?${params.toString()}`);
-        es.onmessage = e => {
+        currentES = new EventSource(`/pipeline/run-stream?${params.toString()}`);
+        currentES.onmessage = e => {
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
-        es.addEventListener('step', e => {
+        currentES.addEventListener('step', e => {
           try {
             const data = JSON.parse(e.data);
             updateProgress(data.id, data.step);
           } catch {}
         });
-        es.addEventListener('done', e => {
-          es.close();
+        currentES.addEventListener('done', e => {
+          closeES();
           try {
             const data = JSON.parse(e.data);
             div.textContent = `Processed ${data.processed} articles`;
@@ -240,6 +252,7 @@
 
       pipelineForm.addEventListener('submit', e => {
         e.preventDefault();
+        closeES();
         const log = document.getElementById('scrapeLog');
         const div = document.getElementById('scrapeResults');
         log.textContent = '';
@@ -256,19 +269,19 @@
         if (since) params.set('since', since);
         if (incomplete) params.set('incomplete', '1');
 
-        const es = new EventSource(`/pipeline/run-stream?${params.toString()}`);
-        es.onmessage = e => {
+        currentES = new EventSource(`/pipeline/run-stream?${params.toString()}`);
+        currentES.onmessage = e => {
           log.textContent += e.data + '\n';
           log.scrollTop = log.scrollHeight;
         };
-        es.addEventListener('step', e => {
+        currentES.addEventListener('step', e => {
           try {
             const data = JSON.parse(e.data);
             updateProgress(data.id, data.step);
           } catch {}
         });
-        es.addEventListener('done', e => {
-          es.close();
+        currentES.addEventListener('done', e => {
+          closeES();
           try {
             const data = JSON.parse(e.data);
             div.textContent = `Processed ${data.processed} articles`;
@@ -278,6 +291,11 @@
           loadArticles();
           loadStats();
         });
+      });
+
+      stopBtn.addEventListener('click', async () => {
+        closeES();
+        try { await fetch('/stop-pipeline', { method: 'POST' }); } catch {}
       });
 
       loadArticles();

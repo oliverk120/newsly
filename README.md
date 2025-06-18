@@ -65,6 +65,12 @@ At the time of writing all **14** tests pass.
 PORT=4000 npm run dev
 ```
 
+## Stopping the pipeline
+
+Click the **Stop** button on the home page to cancel an in‑progress
+scrape/enrich run. This sends a request to the `/stop-pipeline` endpoint
+which halts the current streaming job.
+
 ## Keyword filters
 
 Keyword filters support simple wildcards. Use `*` to match any sequence of
